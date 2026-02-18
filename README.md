@@ -101,6 +101,20 @@ Used only for authentication.
 
 ---
 
+## Test data scripts
+
+To populate base data for testing (departments, areas, document types), run these SQL scripts against the correct database:
+
+| Script | Database | Contents |
+|--------|----------|----------|
+| **Scripts/SeedTestLogin_entTTSAP.sql** | entTTSAP | Test user (test/test), one department, accessgroupactions. Run first for Development login. |
+| **Scripts/SeedTestData_entTTSAP.sql** | entTTSAP | Extra departments (Engineering, QA, HR, Maintenance, Operations, Safety), **asset** (areas), **Bulletin** (document types: SOP, Work Instruction, Procedures, Form, Policy, General). |
+| **Scripts/SeedTestData_DocRet.sql** | DocRet (DefaultConnection) | **Areas** table (if missing) and area rows: HR, Production, Maintenance, Engineering, Quality, Safety, Warehouse, Lab, Operations. |
+
+Run **SeedTestData_entTTSAP.sql** and **SeedTestData_DocRet.sql** after migrations (and after **SeedTestLogin_entTTSAP.sql** if using the test login). All scripts are idempotent.
+
+---
+
 ## Notes
 
 - **DefaultConnection** may be set to the same database as **entTTSAP** (e.g. `entTTSAP`) in some environments; in that case both ApplicationDbContext tables and entTTSAP tables live in one database. The list above is by *connection*, not by physical server.

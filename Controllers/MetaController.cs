@@ -1,4 +1,4 @@
-﻿using ExcelDataReader;
+using ExcelDataReader;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -27,7 +27,15 @@ namespace SOPMSApp.Controllers
         }
         public async Task<IActionResult> Index()
         {
-            await _context.Database.ExecuteSqlRawAsync("EXEC UpdateReviewStatus");
+            try
+            {
+                await _context.Database.ExecuteSqlRawAsync("EXEC UpdateReviewStatus");
+            }
+            catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 2812)
+            {
+                // Stored procedure UpdateReviewStatus does not exist yet; page still loads
+                _logger.LogWarning("UpdateReviewStatus stored procedure not found. Create it in the database to enable review status updates.");
+            }
 
             var documents = _context.DocRegisters
                 .Where(d => d.Status == "Approved" && d.IsArchived == false)
