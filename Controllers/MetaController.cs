@@ -13,7 +13,6 @@ namespace SOPMSApp.Controllers
     {
         private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _env;
-        private readonly entTTSAPDbContext _entTTSAPDbContext;
         private readonly IConfiguration _configuration;
         private readonly ILogger<FileUploadController> _logger;
 
@@ -31,10 +30,12 @@ namespace SOPMSApp.Controllers
             {
                 await _context.Database.ExecuteSqlRawAsync("EXEC UpdateReviewStatus");
             }
-            catch (Microsoft.Data.SqlClient.SqlException ex) when (ex.Number == 2812)
+            catch (Microsoft.Data.SqlClient.SqlException ex)
             {
-                // Stored procedure UpdateReviewStatus does not exist yet; page still loads
-                _logger.LogWarning("UpdateReviewStatus stored procedure not found. Create it in the database to enable review status updates.");
+                if (ex.Number == 2812)
+                    _logger.LogWarning("UpdateReviewStatus stored procedure not found. Create it in the database to enable review status updates.");
+                else
+                    throw;
             }
 
             var documents = _context.DocRegisters
