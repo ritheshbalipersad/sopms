@@ -1,0 +1,617 @@
+﻿@model List<SOPMSApp.Models.StructuredSop>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Work Instruction Revisions</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary: #3498db;
+            --secondary: #2c3e50;
+            --accent: #e74c3c;
+            --light-bg: #f8f9fa;
+            --dark-text: #2c3e50;
+            --light-text: #7f8c8d;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --info: #3498db;
+        }
+
+        body {
+            background-color: #f5f7f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--dark-text);
+        }
+
+        .page-header {
+            border-bottom: 3px solid var(--secondary);
+            padding-bottom: 15px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            border: none;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+            .card:hover {
+                transform: translateY(-5px);
+                box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            }
+
+        .table-container {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .table thead th {
+            background-color: var(--primary);
+            color: white;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            letter-spacing: 0.5px;
+            padding: 15px 20px;
+            border: none;
+            position: relative;
+            user-select: none;
+            cursor: pointer;
+        }
+
+        .table tbody td {
+            padding: 15px 20px;
+            vertical-align: middle;
+            border-bottom: 1px solid #eaecef;
+        }
+
+        .table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+
+            .table tbody tr:last-child td {
+                border-bottom: none;
+            }
+
+            .table tbody tr:hover {
+                background-color: rgba(52, 152, 219, 0.05);
+            }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 50px;
+            font-weight: 600;
+            font-size: 0.8rem;
+        }
+
+        .btn-action {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-view {
+            background-color: rgba(52, 152, 219, 0.1);
+            color: var(--info);
+            border: 1px solid rgba(52, 152, 219, 0.2);
+        }
+
+            .btn-view:hover {
+                background-color: var(--info);
+                color: white;
+            }
+
+        .btn-pdf {
+            background-color: rgba(231, 76, 60, 0.1);
+            color: var(--danger);
+            border: 1px solid rgba(231, 76, 60, 0.2);
+        }
+
+            .btn-pdf:hover {
+                background-color: var(--danger);
+                color: white;
+            }
+
+        .btn-edit {
+            background-color: rgba(243, 156, 18, 0.1);
+            color: var(--warning);
+            border: 1px solid rgba(243, 156, 18, 0.2);
+        }
+
+            .btn-edit:hover {
+                background-color: var(--warning);
+                color: white;
+            }
+
+        .search-box {
+            position: relative;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .search-input {
+            border: none;
+            padding: 15px 20px;
+            font-size: 1rem;
+            background-color: white;
+        }
+
+            .search-input:focus {
+                outline: none;
+                box-shadow: none;
+            }
+
+        .search-btn {
+            border: none;
+            padding: 0 25px;
+            background-color: var(--secondary);
+            color: white;
+            font-weight: 600;
+        }
+
+            .search-btn:hover {
+                background-color: var(--primary);
+            }
+
+        .reset-btn {
+            border: 2px solid var(--light-text);
+            color: var(--light-text);
+            padding: 13px 25px;
+            font-weight: 600;
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+            .reset-btn:hover {
+                background-color: var(--light-text);
+                color: white;
+            }
+
+        .alert {
+            border-radius: 8px;
+            border: none;
+            padding: 15px 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .empty-state {
+            padding: 50px 20px;
+            text-align: center;
+        }
+
+            .empty-state i {
+                font-size: 5rem;
+                color: #dce1e5;
+                margin-bottom: 20px;
+            }
+
+        .sop-number {
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .revision-badge {
+            display: inline-block;
+            width: 36px;
+            height: 36px;
+            line-height: 36px;
+            text-align: center;
+            border-radius: 50%;
+            background-color: var(--secondary);
+            color: white;
+            font-weight: 700;
+        }
+
+        /* Sort indicator styles */
+        .sort-indicator {
+            font-size: 0.8em;
+            opacity: 0.6;
+            margin-left: 5px;
+        }
+
+        .table thead th.sort-asc .sort-indicator::after {
+            content: ' ↑';
+        }
+
+        .table thead th.sort-desc .sort-indicator::after {
+            content: ' ↓';
+        }
+
+        .table thead th.sort-asc,
+        .table thead th.sort-desc {
+            background-color: #2a6fb5; /* Darker shade for active sort */
+        }
+
+        @@media (max-width: 768px) {
+            .table-container {
+                overflow-x: auto;
+            }
+
+            .search-box {
+                margin-bottom: 15px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            .btn-action {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container-fluid py-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="page-header">
+                    <h1 class="h2 fw-bold text-primary"><i class="fas fa-file-alt me-2"></i>Structured Documents Management</h1>
+                    <p class="text-muted">Manage and review all Structured Document</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <form asp-action="Index" method="post" class="row g-3 align-items-center">
+                    <div class="col-md-8 col-lg-9">
+                        <div class="search-box">
+                            <div class="input-group">
+                                <input type="text" name="searchTerm" class="form-control search-input" placeholder="Enter SOP number, title, or department..." value="@ViewBag.SearchTerm">
+                                <button type="submit" class="btn search-btn">
+                                    <i class="fas fa-search me-2"></i>Search
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    @if (ViewBag.showReset)
+                    {
+                        <div class="col-md-4 col-lg-3">
+                            <a asp-action="Index" class="btn reset-btn w-100">
+                                <i class="fas fa-undo me-2"></i>Reset
+                            </a>
+                        </div>
+                    }
+                </form>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                @if (TempData["Success"] != null)
+                {
+                    <div class="alert alert-success alert-dismissible fade show">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>@TempData["Success"]</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+                @if (TempData["Error"] != null)
+                {
+                    <div class="alert alert-danger alert-dismissible fade show">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <strong>@TempData["Error"]</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+                @if (TempData["Warning"] != null)
+                {
+                    <div class="alert alert-warning alert-dismissible fade show">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>@TempData["Warning"]</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+                @if (ViewBag.Message != null)
+                {
+                    <div class="alert alert-info alert-dismissible fade show">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>@ViewBag.Message</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (Model != null && Model.Any())
+        {
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-body p-0">
+                            <div class="table-container">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-primary">
+                                        <tr>
+                                            <th class="ps-4">SOP Number <span class="sort-indicator">↕</span></th>
+                                            <th>Title <span class="sort-indicator">↕</span></th>
+                                            <th>Created by<span class="sort-indicator">↕</span></th>
+                                            <th>Department <span class="sort-indicator">↕</span></th>
+                                            <th>Revision <span class="sort-indicator">↕</span></th>
+                                            <th>Last Review <span class="sort-indicator">↕</span></th>
+                                            <th>Effective <span class="sort-indicator">↕</span></th>
+                                            <th>Area <span class="sort-indicator">↕</span></th>
+                                            <th>Status <span class="sort-indicator">↕</span></th>
+                                            <th class="text-end pe-4">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var sop in Model)
+                                        {
+                                            <tr>
+                                                <td class="ps-4 sop-number">@sop.SopNumber</td>
+                                                <td>@sop.Title</td>
+                                                  <td>@sop.Signatures</td>
+                                                <td>@sop.ControlledBy</td>
+                                                <td class="text-center">
+                                                    <span>@sop.Revision</span>
+                                                </td>
+                                                <td data-sort="@sop.CreatedDate.ToString("yyyy-MM-dd")">@sop.CreatedDate.ToString("MMM dd, yyyy")</td>
+                                                <td data-sort="@sop.EffectiveDate.ToString("yyyy-MM-dd")">
+                                                    @if (sop.EffectiveDate != default(DateTime))
+                                                    {
+                                                        var daysDiff = (sop.EffectiveDate - DateTime.Today).Days;
+
+                                                        if (daysDiff > 0 && daysDiff <= 30)
+                                                        {
+                                                            <span class="text-warning fw-bold">Expires in @daysDiff day(s)</span>
+                                                        }
+                                                        else if (daysDiff == 0)
+                                                        {
+                                                            <span class="text-danger fw-bold">Expires today</span>
+                                                        }
+                                                        else if (daysDiff < 0)
+                                                        {
+                                                            var pastDays = Math.Abs(daysDiff);
+
+                                                            if (pastDays == 1)
+                                                            {
+                                                                <span class="text-danger fw-bold">Expired 1 day ago</span>
+                                                            }
+                                                            else if (pastDays < 30)
+                                                            {
+                                                                <span class="text-danger fw-bold">Expired @pastDays days ago</span>
+                                                            }
+                                                            else if (pastDays < 365)
+                                                            {
+                                                                var monthsAgo = pastDays / 30;
+                                                                <span class="text-danger fw-bold">Expired @monthsAgo month(s) ago</span>
+                                                            }
+                                                            else
+                                                            {
+                                                                var yearsAgo = pastDays / 365;
+                                                                <span class="text-danger fw-bold">Expired @yearsAgo year(s) ago</span>
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            <span class="text-success fw-bold">Valid until @sop.EffectiveDate.ToString("MMM dd, yyyy")</span>
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted">N/A</span>
+                                                    }
+                                                </td>
+                                                <td>@sop.Area</td>
+                                                <td>
+                                                    @if (sop.Status.Equals("Approved", StringComparison.OrdinalIgnoreCase))
+                                                    {
+                                                        <span class="text-muted">@sop.Status</span>
+                                                    }
+                                                    else
+                                                    {
+                                                        <span class="text-muted fw-bold">@sop.SopNumber is @sop.Status</span>
+                                                    }
+                                                </td>
+                                                <td class="text-end pe-4">
+                                                    <div class="d-flex justify-content-end gap-2 action-buttons">
+                                                        @if (sop.Status.Equals("Approved", StringComparison.OrdinalIgnoreCase))
+                                                        {
+                                                            <!-- Always View -->
+                                                            <a asp-action="Details" asp-route-id="@sop.Id"
+                                                               class="btn btn-sm btn-outline-secondary"
+                                                               title="View details">
+                                                                <i class="fas fa-eye me-1"></i> View
+                                                            </a>
+
+                                                            @if (User.IsInRole("Admin"))
+                                                            {
+                                                                <a asp-action="ExportSopToPdf" asp-route-id="@sop.Id"
+                                                                   class="btn btn-sm btn-outline-danger"
+                                                                   title="Export PDF">
+                                                                    <i class="fas fa-file-pdf me-1"></i> PDF
+                                                                </a>
+                                                            }
+
+                                                            @if (User.IsInRole("Admin") || User.IsInRole("Manager"))
+                                                            {
+                                                                <a asp-action="Edit" asp-route-id="@sop.Id"
+                                                                   class="btn btn-sm btn-warning"
+                                                                   title="Revise SOP">
+                                                                    <i class="fas fa-edit me-1"></i> Revise
+                                                                </a>
+                                                            }
+                                                        }
+                                                        else
+                                                        {
+                                                            if (sop.Status.Equals("Returned for Review", StringComparison.OrdinalIgnoreCase))
+                                                            {
+                                                                <!-- Returned for Review Actions -->
+                                                                <a asp-action="Details" asp-route-id="@sop.Id"
+                                                                   class="btn btn-sm btn-outline-secondary rounded-pill px-3"
+                                                                   title="Review returned SOP">
+                                                                    <i class="fas fa-eye me-1"></i> Review
+                                                                </a>
+
+                                                                <a asp-action="Edit" asp-route-id="@sop.Id"
+                                                                   class="btn btn-sm btn-outline-primary rounded-pill px-3"
+                                                                   title="Update SOP">
+                                                                    <i class="fas fa-sync-alt me-1"></i> Update
+                                                                </a>
+                                                            }
+                                                        }
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="row">
+                <div class="col-12">
+                    <div class="card">
+                        <div class="empty-state">
+                            <i class="fas fa-file-alt"></i>
+                            <h4 class="text-muted mt-3">No SOPs found</h4>
+                            <p class="text-muted mb-4">Try adjusting your search or filter to find what you're looking for.</p>
+                            <a asp-action="Create" class="btn btn-primary btn-lg">
+                                <i class="fas fa-plus-circle me-2"></i> Create New Document
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Current sort state
+        let currentSort = {
+            column: null,
+            direction: 'asc' // 'asc' or 'desc'
+        };
+
+        // Sort functions
+        function sortTable(columnIndex) {
+            const table = document.querySelector('.table tbody');
+            const rows = Array.from(table.querySelectorAll('tr'));
+            const header = document.querySelectorAll('.table thead th')[columnIndex];
+            
+            // Remove existing sort indicators
+            document.querySelectorAll('.table thead th').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+            });
+            
+            // Toggle direction if clicking the same column
+            if (currentSort.column === columnIndex) {
+                currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                currentSort.column = columnIndex;
+                currentSort.direction = 'asc';
+            }
+            
+            // Add sort indicator to header
+            header.classList.add(`sort-${currentSort.direction}`);
+            
+            // Sort rows
+            rows.sort((a, b) => {
+                const aCell = a.cells[columnIndex];
+                const bCell = b.cells[columnIndex];
+                
+                // Use data-sort attribute if available, otherwise use text content
+                let aValue = aCell.getAttribute('data-sort') || aCell.textContent.trim();
+                let bValue = bCell.getAttribute('data-sort') || bCell.textContent.trim();
+                
+                // Special handling for different data types
+                switch(columnIndex) {
+                    case 0: // SOP Number
+                        // Extract numeric parts for natural sorting
+                        aValue = extractSopNumber(aValue);
+                        bValue = extractSopNumber(bValue);
+                        break;
+                    case 3: // Revision
+                        aValue = parseFloat(aValue) || 0;
+                        bValue = parseFloat(bValue) || 0;
+                        break;
+                    case 4: // Last Review (Date)
+                        aValue = new Date(aValue);
+                        bValue = new Date(bValue);
+                        break;
+                    case 5: // Effective Date (using data-sort attribute)
+                        aValue = new Date(aValue);
+                        bValue = new Date(bValue);
+                        break;
+                    case 6: // Area
+                    case 2: // Department
+                        // Text sorting (case insensitive)
+                        aValue = aValue.toLowerCase();
+                        bValue = bValue.toLowerCase();
+                        break;
+                    case 7: // Status
+                        // Custom status order
+                        const statusOrder = {
+                            'approved': 1,
+                            'pending': 2,
+                            'draft': 3,
+                            'returned for review': 4
+                        };
+                        aValue = statusOrder[aValue.toLowerCase()] || 5;
+                        bValue = statusOrder[bValue.toLowerCase()] || 5;
+                        break;
+                    default:
+                        // Default text sorting
+                        aValue = aValue.toLowerCase();
+                        bValue = bValue.toLowerCase();
+                }
+                
+                // Compare values
+                let comparison = 0;
+                if (aValue > bValue) {
+                    comparison = 1;
+                } else if (aValue < bValue) {
+                    comparison = -1;
+                }
+                
+                // Apply direction
+                return currentSort.direction === 'asc' ? comparison : -comparison;
+            });
+            
+            // Re-append sorted rows
+            rows.forEach(row => table.appendChild(row));
+        }
+        
+        // Helper function to extract SOP number for sorting
+        function extractSopNumber(sopText) {
+            // Extract numeric parts from SOP number (e.g., "SOP-001" -> "001")
+            const match = sopText.match(/\d+/);
+            return match ? parseInt(match[0], 10) : 0;
+        }
+        
+        // Add click handlers to table headers
+        document.addEventListener('DOMContentLoaded', function() {
+            const headers = document.querySelectorAll('.table thead th');
+            headers.forEach((header, index) => {
+                // Skip the Actions column
+                if (index !== headers.length - 1) {
+                    header.style.cursor = 'pointer';
+                    header.addEventListener('click', () => sortTable(index));
+                }
+            });
+        });
+    </script>
+</body>
+</html>

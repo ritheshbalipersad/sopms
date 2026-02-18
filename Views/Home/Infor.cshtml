@@ -1,0 +1,815 @@
+﻿@using SOPMSApp.ViewModels
+
+@{
+    ViewData["Title"] = "SOP Document Management System";
+}
+
+<div class="container-fluid px-0">
+    <!-- Enhanced Hero Section -->
+    <div class="hero-section bg-primary-gradient py-5">
+        <div class="container py-5">
+            <div class="row align-items-center">
+                <div class="col-lg-6 text-center text-lg-start">
+                    <div class="hero-badge mb-3">
+                        <span class="badge bg-light text-primary px-3 py-2 rounded-pill">
+                            <i class="bi bi-star-fill me-1"></i>Enterprise Platform
+                        </span>
+                    </div>
+                    <h1 class="display-3 fw-bold text-white mb-3">
+                        <span class="hero-gradient-text">SOP Document</span><br>
+                        Management System
+                    </h1>
+                    <p class="lead text-white-80 mb-4">A fully integrated web platform designed to manage the complete lifecycle of Standard Operating Procedures across all departments.</p>
+                    <div class="d-flex gap-3 justify-content-center justify-content-lg-start flex-wrap">
+                        @if (User.Identity.IsAuthenticated)
+                        {
+                            @if (User.IsInRole("Manager") || User.IsInRole("Admin"))
+                            {
+                                <a class="btn btn-light btn-lg px-4 upload-warning-link hero-btn" asp-controller="FileUpload" asp-action="Index">
+                                    <i class="bi bi-cloud-arrow-up-fill me-2"></i> Upload SOP
+                                </a>
+                            }
+                        }
+                        else
+                        {
+                            <a href="http://ttsapdatvmaint.ttaf.local/mc_web/onsite/mc_signupstart.asp" class="btn btn-light btn-lg px-4 hero-btn" target="_blank">
+                                <i class="bi bi-rocket-takeoff me-2"></i>Get Started
+                            </a>
+                        }
+                        <a href="#features" class="btn btn-outline-light btn-lg hero-btn">
+                            <i class="bi bi-play-circle me-2"></i>Watch Demo
+                        </a>
+                    </div>
+                    <div class="mt-4 d-flex flex-wrap gap-4 text-white-60">
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-shield-check me-2"></i>
+                            <small>ISO Compliant</small>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-graph-up me-2"></i>
+                            <small>Real-time Analytics</small>
+                        </div>
+                        <div class="d-flex align-items-center">
+                            <i class="bi bi-clock-history me-2"></i>
+                            <small>Automated Workflows</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6 text-center mt-5 mt-lg-0">
+                    <div class="hero-visual">
+                        <div class="floating-dashboard">
+                            <div class="dashboard-card card-1">
+                                <div class="card-header">
+                                    <i class="bi bi-bar-chart"></i>
+                                    <span>Analytics</span>
+                                </div>
+                                <div class="card-content">
+                                    <div class="stat">98%</div>
+                                    <div class="label">Compliance</div>
+                                </div>
+                            </div>
+                            <div class="dashboard-card card-2">
+                                <div class="card-header">
+                                    <i class="bi bi-files"></i>
+                                    <span>Documents</span>
+                                </div>
+                                <div class="card-content">
+                                    <div class="stat">@(Model.ActiveSopCount > 0 ? Model.ActiveSopCount.ToString() : "250+")</div>
+                                    <div class="label">Active SOPs</div>
+                                </div>
+                            </div>
+                            <div class="dashboard-card card-3">
+                                <div class="card-header">
+                                    <i class="bi bi-people"></i>
+                                    <span>Teams</span>
+                                </div>
+                                <div class="card-content">
+                                    <div class="stat">@(Model.DepartmentCount > 0 ? Model.DepartmentCount.ToString() : "12")</div>
+                                    <div class="label">Departments</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Features Section -->
+    <div id="features" class="container py-5">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold text-primary mb-3">Complete SOP Lifecycle Management</h2>
+            <p class="lead text-muted">Enterprise-grade features for compliance, control, and collaboration</p>
+            <div class="row justify-content-center mt-4">
+                <div class="col-lg-8">
+                    <div class="d-flex flex-wrap justify-content-center gap-2">
+                        <span class="feature-tag">Centralized Storage</span>
+                        <span class="feature-tag">Version Control</span>
+                        <span class="feature-tag">Approval Workflows</span>
+                        <span class="feature-tag">Role-Based Access</span>
+                        <span class="feature-tag">Real-time Analytics</span>
+                        <span class="feature-tag">Bulk Operations</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-4">
+            <!-- Feature 1 -->
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm feature-card" data-aos="fade-up">
+                    <div class="card-body p-4">
+                        <div class="feature-icon-wrapper mb-3">
+                            <div class="icon-lg bg-primary bg-opacity-10 text-primary rounded-3">
+                                <i class="bi bi-cloud-arrow-up fs-2"></i>
+                            </div>
+                        </div>
+                        <h5 class="fw-bold mb-3">Centralized SOP Storage & Metadata</h5>
+                        <p class="text-muted mb-3">Streamline document uploads with standardized metadata tagging including SOP Number, Department, Document Type, and Revision tracking.</p>
+                        <ul class="feature-list">
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Enhanced searchability</li>
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Efficient filtering & auditing</li>
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Cross-department consistency</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature 2 -->
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm feature-card" data-aos="fade-up" data-aos-delay="100">
+                    <div class="card-body p-4">
+                        <div class="feature-icon-wrapper mb-3">
+                            <div class="icon-lg bg-success bg-opacity-10 text-success rounded-3">
+                                <i class="bi bi-arrow-repeat fs-2"></i>
+                            </div>
+                        </div>
+                        <h5 class="fw-bold mb-3">Automated Revision Control</h5>
+                        <p class="text-muted mb-3">Built-in revision management with automatic archiving, version incrementation, and complete audit trail preservation.</p>
+                        <ul class="feature-list">
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Automatic version archiving</li>
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Full audit trail</li>
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>QA compliance standards</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature 3 -->
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm feature-card" data-aos="fade-up" data-aos-delay="200">
+                    <div class="card-body p-4">
+                        <div class="feature-icon-wrapper mb-3">
+                            <div class="icon-lg bg-info bg-opacity-10 text-info rounded-3">
+                                <i class="bi bi-clipboard-check fs-2"></i>
+                            </div>
+                        </div>
+                        <h5 class="fw-bold mb-3">Document Review Workflow</h5>
+                        <p class="text-muted mb-3">Role-based approval pipeline ensuring proper review before document release with multi-stage verification.</p>
+                        <ul class="feature-list">
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Draft → QA → Approval</li>
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Regulatory compliance</li>
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Manager oversight</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature 4 -->
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm feature-card" data-aos="fade-up" data-aos-delay="300">
+                    <div class="card-body p-4">
+                        <div class="feature-icon-wrapper mb-3">
+                            <div class="icon-lg bg-warning bg-opacity-10 text-warning rounded-3">
+                                <i class="bi bi-shield-lock fs-2"></i>
+                            </div>
+                        </div>
+                        <h5 class="fw-bold mb-3">Role-Based Access Control</h5>
+                        <p class="text-muted mb-3">Defined permissions ensuring data integrity and preventing unauthorized modifications across user roles.</p>
+                        <ul class="feature-list">
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Administrator controls</li>
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Manager approvals</li>
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Employee view-only</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature 5 -->
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm feature-card" data-aos="fade-up" data-aos-delay="400">
+                    <div class="card-body p-4">
+                        <div class="feature-icon-wrapper mb-3">
+                            <div class="icon-lg bg-danger bg-opacity-10 text-danger rounded-3">
+                                <i class="bi bi-graph-up fs-2"></i>
+                            </div>
+                        </div>
+                        <h5 class="fw-bold mb-3">Dashboard & Analytics</h5>
+                        <p class="text-muted mb-3">Real-time insights into SOP activity, compliance metrics, and departmental performance indicators.</p>
+                        <ul class="feature-list">
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Compliance percentages</li>
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Review cycle duration</li>
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Expiring SOP tracking</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Feature 6 -->
+            <div class="col-md-6 col-lg-4">
+                <div class="card h-100 border-0 shadow-sm feature-card" data-aos="fade-up" data-aos-delay="500">
+                    <div class="card-body p-4">
+                        <div class="feature-icon-wrapper mb-3">
+                            <div class="icon-lg bg-secondary bg-opacity-10 text-secondary rounded-3">
+                                <i class="bi bi-file-earmark-spreadsheet fs-2"></i>
+                            </div>
+                        </div>
+                        <h5 class="fw-bold mb-3">Bulk Operations & Integration</h5>
+                        <p class="text-muted mb-3">Excel integration for bulk uploads, automated metadata extraction, and mass SOP entry creation.</p>
+                        <ul class="feature-list">
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Excel template support</li>
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Legacy system migration</li>
+                            <li><i class="bi bi-check-circle-fill text-success me-2"></i>Automated metadata</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Workflow Section -->
+    <div class="bg-light py-5">
+        <div class="container py-4">
+            <div class="row align-items-center">
+                <div class="col-lg-6 mb-4 mb-lg-0">
+                    <h2 class="fw-bold text-primary mb-4">Document Approval Workflow</h2>
+                    <p class="text-muted mb-4">Streamlined multi-stage approval process ensuring compliance and quality at every step.</p>
+                    <div class="timeline">
+                        <div class="timeline-item">
+                            <div class="timeline-icon bg-primary text-white">
+                                <i class="bi bi-upload"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <h5>Document Submission</h5>
+                                <p>Users upload new or revised SOP documents with comprehensive metadata</p>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-icon bg-warning text-white">
+                                <i class="bi bi-hourglass"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <h5>Pending Review</h5>
+                                <p>Documents await review by designated department managers</p>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-icon bg-info text-white">
+                                <i class="bi bi-clipboard-check"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <h5>Quality Assurance</h5>
+                                <p>Quality team verifies compliance with internal and external standards</p>
+                            </div>
+                        </div>
+                        <div class="timeline-item">
+                            <div class="timeline-icon bg-success text-white">
+                                <i class="bi bi-check-circle"></i>
+                            </div>
+                            <div class="timeline-content">
+                                <h5>Approval & Publication</h5>
+                                <p>Final approval and automatic distribution to relevant teams</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-6">
+                    <div class="card border-0 shadow stats-card">
+                        <div class="card-body p-4">
+                            <h4 class="fw-bold mb-4">System Performance Metrics</h4>
+                            <div class="row">
+                                <!-- Active SOPs -->
+                                <div class="col-6 mb-4">
+                                    <div class="stat-card bg-primary bg-opacity-10 p-3 rounded-3">
+                                        <h3 class="text-primary fw-bold">
+                                            @(Model.ActiveSopCount > 0 ? Model.ActiveSopCount.ToString() : "N/A")
+                                        </h3>
+                                        <p class="mb-0 text-muted">Active SOP Documents</p>
+                                    </div>
+                                </div>
+
+                                <!-- Compliance Rate -->
+                                <div class="col-6 mb-4">
+                                    <div class="stat-card bg-success bg-opacity-10 p-3 rounded-3">
+                                        <h3 class="text-success fw-bold">
+                                            @(Model.ComplianceRate > 0 ? $"{Model.ComplianceRate:F1}%" : "N/A")
+                                        </h3>
+                                        <p class="mb-0 text-muted">Compliance Rate</p>
+                                    </div>
+                                </div>
+
+                                <!-- Departments -->
+                                <div class="col-6 mb-4">
+                                    <div class="stat-card bg-info bg-opacity-10 p-3 rounded-3">
+                                        <h3 class="text-info fw-bold">
+                                            @(Model.DepartmentCount > 0 ? Model.DepartmentCount.ToString() : "N/A")
+                                        </h3>
+                                        <p class="mb-0 text-muted">Departments</p>
+                                    </div>
+                                </div>
+
+                                <!-- Avg. Review Days -->
+                                <div class="col-6 mb-4">
+                                    <div class="stat-card bg-warning bg-opacity-10 p-3 rounded-3">
+                                        <h3 class="text-warning fw-bold">
+                                            @(Model.AverageReviewDays > 0 ? $"{Model.AverageReviewDays:F1}" : "N/A")
+                                        </h3>
+                                        <p class="mb-0 text-muted">Avg. Review Days</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="mt-4">
+                                <div class="progress mb-2" style="height: 8px;">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: 85%" aria-valuenow="85" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <small class="text-muted">System adoption rate across departments</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced System Overview Section -->
+    @if (User.Identity.IsAuthenticated && (User.IsInRole("Manager") || User.IsInRole("Admin")))
+    {
+        <div id="system-overview" class="container my-5">
+            <div class="card border-0 shadow-sm overview-card">
+                <div class="card-header-custom">
+                    <h3 class="mb-0"><i class="bi bi-info-circle me-2"></i>About the SOP Document Management System</h3>
+                </div>
+                <div class="card-body p-4">
+                    <div class="overview-intro mb-4">
+                        <p class="lead text-primary">
+                            The SOP Document Management System (SOP-DMS) is a fully integrated web platform designed to manage the complete lifecycle of Standard Operating Procedures across all departments.
+                        </p>
+                    </div>
+                    <div class="row">
+                        <div class="col-lg-6">
+                            <div class="overview-point">
+                                <h5><i class="bi bi-check-square text-success me-2"></i>Centralized Control</h5>
+                                <p class="text-muted">It centralizes document creation, storage, revision, and distribution, ensuring that every SOP remains accurate, compliant, and easily accessible.</p>
+                            </div>
+                            <div class="overview-point">
+                                <h5><i class="bi bi-check-square text-success me-2"></i>Structured Metadata</h5>
+                                <p class="text-muted">At its core, SOP-DMS simplifies document upload and classification by allowing users to add metadata such as SOP Number, Department, Document Type, Effective Date, and Revision.</p>
+                            </div>
+                            <div class="overview-point">
+                                <h5><i class="bi bi-check-square text-success me-2"></i>Automated Revision Control</h5>
+                                <p class="text-muted">The system features an automated revision management process that tracks every update made to a document.</p>
+                            </div>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="overview-point">
+                                <h5><i class="bi bi-check-square text-success me-2"></i>Workflow Efficiency</h5>
+                                <p class="text-muted">A built-in document approval workflow streamlines collaboration between authors, managers, and quality reviewers.</p>
+                            </div>
+                            <div class="overview-point">
+                                <h5><i class="bi bi-check-square text-success me-2"></i>Security & Access Control</h5>
+                                <p class="text-muted">Role-based access control (RBAC) ensures that each user operates within defined permissions.</p>
+                            </div>
+                            <div class="overview-point">
+                                <h5><i class="bi bi-check-square text-success me-2"></i>Comprehensive Analytics</h5>
+                                <p class="text-muted">The dashboard and analytics module provides real-time insights into departmental SOP statistics, revision trends, and compliance rates.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="overview-footer mt-4 p-3 bg-light rounded">
+                        <p class="text-muted mb-0">
+                            <strong>Overall Impact:</strong> The SOP-DMS has evolved into a comprehensive digital knowledge hub that bridges people, processes, and compliance. It promotes efficiency, accountability, and collaboration—helping teams work smarter while maintaining the highest operational standards across the organization.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
+    <!-- Enhanced CTA Section -->
+    <div class="cta-section bg-primary py-5">
+        <div class="container text-center text-white py-4">
+            <h2 class="fw-bold mb-4">Ready to Transform Your Document Management?</h2>
+            <p class="lead mb-5 opacity-75">Join hundreds of organizations using SOP-DMS to streamline their compliance processes</p>
+            <div class="d-flex gap-3 justify-content-center flex-wrap">
+                <a href="http://ttsapdatvmaint.ttaf.local/mc_web/onsite/mc_signupstart.asp" class="btn btn-light btn-lg px-4 cta-btn" target="_blank">
+                    <i class="bi bi-rocket-takeoff me-2"></i>Get Started Today
+                </a>
+               
+            </div>
+            <div class="mt-4">
+                <small class="opacity-75">No credit card required • 30-day free trial • Enterprise support</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Enhanced CSS Styles -->
+<style>
+    :root {
+        --primary: #0d6efd;
+        --primary-dark: #0b5ed7;
+        --success: #198754;
+        --info: #0dcaf0;
+        --warning: #ffc107;
+        --danger: #dc3545;
+        --light: #f8f9fa;
+        --dark: #212529;
+    }
+
+    .hero-section {
+        background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 50%, #084298 100%);
+        position: relative;
+        overflow: hidden;
+    }
+
+        .hero-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff" fill-opacity="0.1" d="M0,96L48,112C96,128,192,160,288,186.7C384,213,480,235,576,213.3C672,192,768,128,864,128C960,128,1056,192,1152,192C1248,192,1344,128,1392,96L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>');
+            background-size: cover;
+            background-position: bottom;
+        }
+
+    .hero-gradient-text {
+        background: linear-gradient(45deg, #fff, #e3f2fd);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .hero-badge {
+        animation: fadeInDown 1s ease;
+    }
+
+    .text-white-80 {
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    .text-white-60 {
+        color: rgba(255, 255, 255, 0.6);
+    }
+
+    .hero-btn {
+        border-radius: 50px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        padding: 12px 24px;
+    }
+
+        .hero-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+    .floating-dashboard {
+        position: relative;
+        height: 300px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .dashboard-card {
+        position: absolute;
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        padding: 15px;
+        width: 160px;
+        transition: all 0.5s ease;
+    }
+
+        .dashboard-card .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+            .dashboard-card .card-header i {
+                margin-right: 5px;
+            }
+
+        .dashboard-card .card-content .stat {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--dark);
+        }
+
+        .dashboard-card .card-content .label {
+            font-size: 0.8rem;
+            color: #6c757d;
+        }
+
+    .card-1 {
+        top: 20px;
+        left: 0;
+        transform: rotate(-5deg);
+        z-index: 3;
+    }
+
+    .card-2 {
+        top: 80px;
+        left: 180px;
+        transform: rotate(3deg);
+        z-index: 2;
+    }
+
+    .card-3 {
+        top: 150px;
+        left: 40px;
+        transform: rotate(8deg);
+        z-index: 1;
+    }
+
+    .floating-dashboard:hover .card-1 {
+        transform: translateY(-10px) rotate(-5deg);
+    }
+
+    .floating-dashboard:hover .card-2 {
+        transform: translateY(-10px) rotate(3deg);
+    }
+
+    .floating-dashboard:hover .card-3 {
+        transform: translateY(-10px) rotate(8deg);
+    }
+
+    .feature-tag {
+        background: rgba(13, 110, 253, 0.1);
+        color: var(--primary);
+        padding: 5px 12px;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    .feature-card {
+        transition: all 0.3s ease;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+        .feature-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.15) !important;
+        }
+
+    .feature-icon-wrapper {
+        transition: all 0.3s ease;
+    }
+
+    .feature-card:hover .feature-icon-wrapper {
+        transform: scale(1.1);
+    }
+
+    .feature-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+        .feature-list li {
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+    .icon-lg {
+        width: 70px;
+        height: 70px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+    }
+
+    .timeline {
+        position: relative;
+        padding-left: 50px;
+    }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 25px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, var(--primary), var(--success));
+        }
+
+    .timeline-item {
+        position: relative;
+        margin-bottom: 30px;
+    }
+
+    .timeline-icon {
+        position: absolute;
+        left: -50px;
+        top: 0;
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+        transition: all 0.3s ease;
+    }
+
+    .timeline-item:hover .timeline-icon {
+        transform: scale(1.1);
+    }
+
+    .timeline-content {
+        padding: 20px;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
+    }
+
+    .timeline-item:hover .timeline-content {
+        box-shadow: 0 8px 25px rgba(0,0,0,0.12);
+    }
+
+    .stats-card, .overview-card {
+        transition: all 0.3s ease;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+        .stats-card:hover, .overview-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15) !important;
+        }
+
+    .stat-card {
+        transition: all 0.3s ease;
+        border-radius: 10px;
+    }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+
+    .card-header-custom {
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: white;
+        border-radius: 0 !important;
+        padding: 1.5rem;
+    }
+
+    .overview-point {
+        margin-bottom: 1.5rem;
+    }
+
+        .overview-point h5 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+    .cta-section {
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+        position: relative;
+        overflow: hidden;
+    }
+
+        .cta-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320"><path fill="%23ffffff" fill-opacity="0.05" d="M0,192L48,197.3C96,203,192,213,288,229.3C384,245,480,267,576,261.3C672,256,768,224,864,218.7C960,213,1056,235,1152,224C1248,213,1344,171,1392,149.3L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path></svg>');
+            background-size: cover;
+            background-position: bottom;
+        }
+
+    .cta-btn {
+        border-radius: 50px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        padding: 12px 24px;
+    }
+
+        .cta-btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+
+    @@keyframes fadeInDown {
+        from
+
+    {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    }
+
+    /* Responsive adjustments */
+    @@media (max-width: 768px) {
+        .hero-section
+
+    {
+        text-align: center;
+    }
+
+    .floating-dashboard {
+        height: 200px;
+        margin-top: 2rem;
+    }
+
+    .dashboard-card {
+        width: 120px;
+        padding: 10px;
+    }
+
+        .dashboard-card .card-content .stat {
+            font-size: 1.4rem;
+        }
+
+    }
+</style>
+
+<!-- JavaScript Libraries -->
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/aos@2.3.4/dist/aos.js"></script>
+
+<script>
+    // Initialize AOS animations
+    AOS.init({
+        duration: 800,
+        once: true,
+        offset: 100
+    });
+
+    // Initialize all dropdowns and tooltips
+    $(document).ready(function() {
+        // Initialize Bootstrap components
+        $('.dropdown-toggle').dropdown();
+
+        // Floating dashboard animation
+        $('.floating-dashboard .dashboard-card').each(function(index) {
+            $(this).css({
+                'animation-delay': (index * 0.2) + 's'
+            });
+        });
+
+        // Upload warning modal functionality
+        var targetUrl = null;
+        $(".upload-warning-link").on("click", function(e) {
+            e.preventDefault();
+            targetUrl = $(this).attr("href");
+            var warningModal = new bootstrap.Modal(document.getElementById("fileWarningModal"));
+            warningModal.show();
+        });
+
+        $("#fileWarningProceedBtn").on("click", function() {
+            if (targetUrl) {
+                var modalEl = document.getElementById("fileWarningModal");
+                var bsModal = bootstrap.Modal.getInstance(modalEl);
+                bsModal.hide();
+                window.location.href = targetUrl;
+            }
+        });
+
+        // Add scroll animations for elements
+        $(window).scroll(function() {
+            $('.feature-card').each(function() {
+                var position = $(this).offset().top;
+                var scrollPosition = $(window).scrollTop() + $(window).height();
+
+                if (position < scrollPosition - 50) {
+                    $(this).addClass('animate-in');
+                }
+            });
+        });
+    });
+</script>

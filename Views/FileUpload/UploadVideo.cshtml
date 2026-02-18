@@ -1,0 +1,567 @@
+﻿@using System.Text.Json
+@model SOPMSApp.Models.ViewModels.VideoUploadViewModel
+@inject IWebHostEnvironment _env
+@{
+    ViewData["Title"] = "Upload Video";
+}
+
+<div class="container mt-4 mb-5">
+    <div class="row align-items-center">
+        <div class="col-md-8">
+            <h1 class="h3 mb-0"><i class="fas fa-video me-2"></i>Upload Video Content</h1>
+            <p class="mb-0 mt-2 opacity-75">Add training or procedural videos to the SOP Management System</p>
+        </div>
+    </div>
+    <hr class="mb-4">
+
+    <!-- Success/Error Alerts -->
+   
+    <!-- Upload Form -->
+    <form id="uploadForm" method="post" enctype="multipart/form-data" asp-action="UploadVideo" class="needs-validation" novalidate>
+        @Html.AntiForgeryToken()
+        <div class="row g-4">
+
+            <!-- SOP Metadata -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <i class="fas fa-file-alt me-2"></i> Document Information
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="ExistingSop" class="form-label required-field">Link to Existing SOP</label>
+                            <select id="ExistingSop" name="ExistingSop" class="form-select" required>
+                                <option value="">-- Select SOP to link video --</option>
+                                @foreach (var sop in Model.ExistingSops)
+                                {
+                                    <option value="@sop.Value">@sop.Text</option>
+                                }
+                            </select>
+                            <small class="text-muted">You must select an existing SOP to upload a video.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="SopNumber" class="form-label required-field">SOP Number</label>
+                            <input type="text" class="form-control" id="SopNumber" name="SopNumber" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label required-field">Document Type</label>
+                            <select name="DocType" class="form-select" readonly>
+                                <option value="">-- Select Document Type --</option>
+                                @foreach (var doc in Model.Documents)
+                                {
+                                    <option value="@doc.Value">@doc.Text</option>
+                                }
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label required-field">Department</label>
+                            <select name="Department" class="form-select" readonly>
+                                <option value="">-- Select Department --</option>
+                                @foreach (var dept in Model.Departments)
+                                {
+                                    <option value="@dept.Value">@dept.Text</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Document Details -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <i class="fas fa-info-circle me-2"></i> Document Details
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="DocumentType" class="form-label required-field">Description</label>
+                            <input type="text" class="form-control" id="DocumentType" name="DocumentType" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="Revision" class="form-label required-field">Revision</label>
+                            <input type="text" class="form-control" id="Revision" name="Revision" readonly>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label required-field">Last Review Date</label>
+                                <input type="date" class="form-control" id="LastReviewDate" name="LastReviewDate" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Next Review Date</label>
+                                <input type="date" class="form-control bg-light" id="EffectiveDate" name="EffectiveDate" readonly>
+                            </div>
+                        </div>
+
+                        <label class="form-label required-field">Review Frequency</label>
+                        <div class="btn-group w-100" role="group">
+                            @for (int i = 1; i <= 5; i++)
+                            {
+                                <input type="radio" class="btn-check" name="yearOption" id="yearOption@(i)" value="@i" onchange="updateEffectiveDate()" @(i == 1 ? "checked" : "")>
+                                <label class="btn btn-outline-secondary" for="yearOption@(i)">@i Year@(i > 1 ? "s" : "")</label>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Video Upload -->
+            <div class="col-12">
+                <div class="card shadow-sm rounded-4">
+                    <div class="card-header bg-primary text-white fw-bold rounded-top-4">
+                        <i class="fas fa-video me-2"></i> Video Details
+                    </div>
+                    <div class="card-body">
+                        <div class="file-upload-container p-4 text-center border border-dashed rounded-3" id="dropZone">
+                            <div class="upload-icon mb-3" style="font-size: 4rem; color: #6c757d;">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <h5 class="fw-semibold mb-1">Drag & Drop your video here</h5>
+                            <p class="text-muted mb-3">or</p>
+                            <input type="file" class="form-control d-none" id="videoFile" name="videoFile" accept=".mp4,.mov,.avi,.mkv,.webm" required>
+                            <button type="button" class="btn btn-outline-primary mb-3" id="browseButton">Browse Files</button>
+                            <div class="mt-3">
+                                <small class="form-text text-muted">Supported formats: MP4, MOV, AVI, MKV, WEBM (Max 2GB)</small>
+                            </div>
+                            <div id="fileInfo" class="mt-3 fw-medium"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Areas -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-layer-group me-2"></i> Applicable Areas
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted mb-3">Select all areas where this video content applies:</p>
+                        <div class="row">
+                            @foreach (var area in Model.Areas)
+                            {
+                                <div class="col-md-3 mb-2">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" name="Area" value="@area" id="area-@area">
+                                        <label class="form-check-label" for="area-@area">@area</label>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Submit -->
+            <div class="col-12">
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end border-top pt-4">
+                    <button type="reset" class="btn btn-outline-secondary me-md-2 px-4">
+                        <i class="fas fa-times me-2"></i> Cancel
+                    </button>
+                    <button type="submit" class="btn btn-primary px-4" id="submitButton">
+                        <i class="fas fa-upload me-2"></i> Upload Video
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+
+@section Scripts {
+    <script src="~/js/jquery-3.7.1.min.js"></script>
+    <script src="~/js/select2.min.js"></script>
+    <link href="~/css/select2.min.css" rel="stylesheet" />
+
+@using System.Text.Json
+@using System.Text.Encodings.Web
+@using System.Text.Unicode
+@using SOPMSApp.Models.ViewModels
+@{
+        // Create safe JSON serialization options
+        var jsonOptions = new JsonSerializerOptions
+        {
+            Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            WriteIndented = false
+        };
+
+        // Safely serialize the dictionary (handles null gracefully)
+        var serializedSopDetails = JsonSerializer.Serialize(
+            Model?.ExistingSopDetails ?? new Dictionary<string, VideoUploadViewModel.ExistingSopDetail>(),
+            jsonOptions
+        );
+
+    }
+
+    <script>
+        const sopDetails = @Html.Raw(@serializedSopDetails);
+    </script>
+
+    <script>
+        $(document).ready(function() {
+            // Initialize Select2
+            $('#ExistingSop').select2({
+                placeholder: "-- Select SOP to link video --",
+                allowClear: true
+            });
+
+            const videoInput = document.getElementById('videoFile');
+            const browseButton = document.getElementById('browseButton');
+            const dropZone = document.getElementById('dropZone');
+            const fileInfo = document.getElementById('fileInfo');
+
+            browseButton.addEventListener('click', () => videoInput.click());
+
+            dropZone.addEventListener('dragover', e => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+
+            dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+            dropZone.addEventListener('drop', e => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) {
+                    handleFile(e.dataTransfer.files[0]);
+                    const dt = new DataTransfer();
+                    dt.items.add(e.dataTransfer.files[0]);
+                    videoInput.files = dt.files;
+                }
+            });
+
+            videoInput.addEventListener('change', () => handleFile(videoInput.files[0]));
+
+            function handleFile(file) {
+                if (!file) return;
+
+                const allowed = ['mp4','mov','avi','mkv','webm'];
+                const ext = file.name.split('.').pop().toLowerCase();
+
+                if (!allowed.includes(ext)) {
+                    alert('Unsupported file format. Please upload MP4, MOV, AVI, MKV, or WEBM files.');
+                    videoInput.value = '';
+                    return;
+                }
+
+                if (file.size > 2147483648) {
+                    alert('File exceeds 2GB limit. Please choose a smaller file.');
+                    videoInput.value = '';
+                    return;
+                }
+
+                fileInfo.innerHTML = `<div class="alert alert-info p-2 mb-0">
+                    <i class="fas fa-file-video me-2"></i>
+                    <strong>${file.name}</strong>
+                    (${(file.size / 1024 / 1024).toFixed(2)} MB)
+                </div>`;
+            }
+
+            // SOP auto-fill
+            $('#ExistingSop').change(function() {
+                const selectedSopNumber = $(this).val();
+                if (!selectedSopNumber) {
+                    resetFormFields();
+                    return;
+                }
+
+                if (sopDetails && sopDetails[selectedSopNumber]) {
+                    populateFormFields(sopDetails[selectedSopNumber]);
+                } else {
+                    console.error('SOP details not found for:', selectedSopNumber);
+                    showError('SOP details not found. Please try selecting again.');
+                    resetFormFields();
+                }
+            });
+
+            function populateFormFields(sopData) {
+                $('#SopNumber').val(sopData.sopNumber || '');
+                $('#DocumentType').val(sopData.description || '');
+                $('select[name="DocType"]').val(sopData.documentType || '');
+                $('#Revision').val(sopData.revision || '');
+
+                if (sopData.lastReviewDate)
+                    $('#LastReviewDate').val(formatDate(sopData.lastReviewDate));
+                if (sopData.effectiveDate)
+                    $('#EffectiveDate').val(formatDate(sopData.effectiveDate));
+
+                if (sopData.department)
+                    $('select[name="Department"]').val(sopData.department);
+
+                $('input[name="Area"]').prop('checked', false);
+                if (sopData.areas && sopData.areas.length > 0) {
+                    sopData.areas.forEach(area => {
+                        const areaValue = typeof area === 'string' ? area : area.value;
+                        $(`input[name="Area"][value="${areaValue}"]`).prop('checked', true);
+                    });
+                }
+
+                setFieldsReadOnly(true);
+                showSuccess('SOP details loaded successfully!');
+                updateEffectiveDate();
+            }
+
+            function resetFormFields() {
+                $('#SopNumber, #DocType, #Revision, #LastReviewDate, #EffectiveDate').val('');
+                $('select[name="DocumentType"], select[name="Department"]').val('');
+                $('input[name="Area"]').prop('checked', false);
+                setFieldsReadOnly(false);
+                $('#yearOption1').prop('checked', true);
+            }
+
+            function setFieldsReadOnly(isReadOnly) {
+                $('#SopNumber, #DocType, #Revision, #LastReviewDate, #EffectiveDate')
+                    .prop('readonly', isReadOnly)
+                    .toggleClass('bg-light', isReadOnly);
+
+                $('select[name="DocumentType"], select[name="Department"]')
+                    .prop('disabled', isReadOnly)
+                    .toggleClass('bg-light', isReadOnly);
+            }
+
+            function formatDate(dateString) {
+                try {
+                    const date = new Date(dateString);
+                    return isNaN(date.getTime())
+                        ? dateString.split('T')[0]
+                        : date.toISOString().split('T')[0];
+                } catch {
+                    return dateString.split('T')[0];
+                }
+            }
+
+            function showAlert(type, message) {
+                $('.auto-alert').remove();
+                const alertDiv = $(`<div class="alert alert-${type} auto-alert alert-dismissible fade show" role="alert">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>`);
+                $('.container').prepend(alertDiv);
+                if (type === 'success') setTimeout(() => alertDiv.alert('close'), 5000);
+            }
+
+            function showSuccess(msg) { showAlert('success', msg); }
+            function showError(msg) { showAlert('danger', msg); }
+
+            function updateEffectiveDate() {
+                const lastReview = $('#LastReviewDate').val();
+                const freq = $('input[name="yearOption"]:checked')?.val() || 1;
+                if (lastReview) {
+                    const d = new Date(lastReview);
+                    d.setFullYear(d.getFullYear() + parseInt(freq));
+                    $('#EffectiveDate').val(d.toISOString().split('T')[0]);
+                }
+            }
+
+            $('input[name="yearOption"]').change(updateEffectiveDate);
+
+            $('#Revision').blur(function() {
+                if (this.value && !this.value.startsWith('Rev:')) {
+                    this.value = 'Rev: ' + this.value;
+                }
+            });
+        });
+    </script>
+}
+
+@section Styles
+{
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #2980b9;
+            --light-bg: #f8f9fa;
+            --border-radius: 8px;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        body {
+            background-color: #f5f7fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
+        }
+
+        .page-header {
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            border-radius: 0 0 var(--border-radius) var(--border-radius);
+        }
+
+        .card {
+            border: none;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+            .card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+            }
+
+        .card-header {
+            background: linear-gradient(to right, var(--primary-color), var(--accent-color));
+            color: white;
+            font-weight: 600;
+            border-radius: var(--border-radius) var(--border-radius) 0 0 !important;
+            padding: 1rem 1.5rem;
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .required-field::after {
+            content: " *";
+            color: #e74c3c;
+        }
+
+        .file-upload-container {
+            background-color: var(--light-bg);
+            border: 2px dashed #bdc3c7;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+            .file-upload-container:hover, .file-upload-container.dragover {
+                background-color: #e8f4fc;
+                border-color: var(--secondary-color);
+            }
+
+        .upload-icon {
+            color: #7f8c8d;
+            transition: color 0.3s ease;
+        }
+
+        .file-upload-container:hover .upload-icon {
+            color: var(--secondary-color);
+        }
+
+        .btn-primary {
+            background: linear-gradient(to right, var(--secondary-color), var(--accent-color));
+            border: none;
+            padding: 0.6rem 1.5rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+            .btn-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+            }
+
+        .btn-outline-secondary.active {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+            color: white;
+        }
+
+        .form-control, .form-select {
+            border-radius: 6px;
+            padding: 0.75rem;
+            border: 1px solid #ced4da;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+
+            .form-control:focus, .form-select:focus {
+                border-color: var(--secondary-color);
+                box-shadow: 0 0 0 0.2rem rgba(52, 152, 219, 0.25);
+            }
+
+        .alert {
+            border: none;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+        }
+
+        .form-check-input:checked {
+            background-color: var(--secondary-color);
+            border-color: var(--secondary-color);
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+            .step-indicator::before {
+                content: '';
+                position: absolute;
+                top: 15px;
+                left: 0;
+                right: 0;
+                height: 2px;
+                background-color: #e0e0e0;
+                z-index: 1;
+            }
+
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .step-number {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background-color: #e0e0e0;
+            color: #777;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .step.active .step-number {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        .step-label {
+            font-size: 0.875rem;
+            color: #777;
+            font-weight: 500;
+        }
+
+        .step.active .step-label {
+            color: var(--secondary-color);
+            font-weight: 600;
+        }
+
+        footer {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1.5rem 0;
+            margin-top: 3rem;
+            text-align: center;
+        }
+
+        @@media (max-width: 768px) {
+            .step-label {
+                font-size: 0.75rem;
+            }
+        }
+
+
+
+    </style>
+
+
+}

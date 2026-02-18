@@ -1,0 +1,652 @@
+﻿@model SOPMSApp.Models.StructuredSop
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IWebHostEnvironment Env
+@using System.Text.RegularExpressions
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+
+
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>@Model.SopNumber - @Model.Title</title>
+        <style>
+            body {
+                font-family: "Aptos Display", 'Arial Rounded MT', sans-serif;
+                font-size: 13pt;
+                margin: 0;
+                padding: 180px 8px 150px 8px;
+                line-height: 1.5;
+                position: relative;
+                letter-spacing: 1px;
+                background-color: white;
+            }
+
+            .header-table, .footer-table, .instruction-table {
+                width: 100%;
+                border-collapse: collapse;
+            }
+
+            h1, h2, h3 {
+                text-align: center;
+                margin: 5px 0;
+            }
+
+            .doc-revision-date {
+                text-align: center;
+                font-weight: bold;
+                font-size: 14pt;
+                font-family: Arial, sans-serif;
+            }
+            .doc-revision-date div + div {
+                margin-top: 6px;
+            }
+
+            .header-table td, .footer-table td {
+                border: 1px solid black;
+                padding: 5px;
+                height: 40px;
+            }
+
+            .logo-cell {
+                width: 120px;
+                text-align: center;
+            }
+
+            .logo {
+                max-height: 90px;
+                width: auto;
+            }
+
+            .doc-title, .doc-type, .doc-number {
+                font-family: Arial, sans-serif;
+                font-size: 14pt;
+                margin-top: 10px;
+                font-weight: bold;
+                text-align: center;
+                vertical-align: middle;
+            }
+
+            th, td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                vertical-align: top;
+            }
+
+            th {
+                background-color: #f2f2f2;
+                text-align: center;
+                font-weight: bold;
+            }
+
+            /* Instruction table */
+            .instruction-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-bottom: 20px;
+                table-layout: fixed;
+                border: 1px solid black;
+            }
+
+            .instruction-table th, 
+            .instruction-table td {
+                border: 1px solid black;
+                padding: 4px;
+            }
+
+            .instruction-text {
+                width: 35%;
+                padding-right: 15px;
+                font-size: 12pt;
+                letter-spacing: 1px;
+            }
+
+            .instruction-image-cell {
+                width: 65%;
+                padding: 15px;
+                text-align: center;
+            }
+
+            .step-image, .key-point-image {
+                max-width: 100%;
+                max-height: 200px;
+                border: 1px solid #ccc;
+                padding: 2px;
+                border-radius: 4px;
+                object-fit: contain;
+                transition: transform 0.3s ease;
+                display: block;
+                margin: 10px auto;
+            }
+            
+            .step-image:hover, .key-point-image:hover {
+                transform: scale(1.02);
+                box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            }
+
+            .key-points {
+                width: 20%;
+                padding-left: 10px;
+                font-size: 11pt;
+            }
+        
+            .instructions-cell {
+                width: 35%;
+                padding: 8px;
+                vertical-align: top;
+            }
+        
+            .image-cell {
+                width: 30%;
+                text-align: center;
+                vertical-align: top;
+                padding: 8px;
+            }
+
+            .footer-container {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                padding: 10px 40px;
+                background-color: white;
+                border-top: 1px solid #ddd;
+            }
+
+            .page-footer {
+                font-size: 10pt;
+                text-align: center;
+            }
+
+            .uncontrolled-notice {
+                font-style: italic;
+                text-align: center;
+                margin-top: 5px;
+                font-size: 10pt;
+            }
+
+            /* Page break controls */
+            .step-row {
+                page-break-inside: avoid;
+            }
+        
+            .step-content {
+                page-break-inside: auto;
+            }
+        
+            .step-header {
+                page-break-after: avoid;
+            }
+        
+            /* Ensure content stays within cells */
+            .instruction-table td {
+                overflow: hidden;
+            }
+        
+            .image-container {
+                max-height: 250px;
+                overflow: hidden;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                flex-direction: column;
+            }
+
+            .multiple-images {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 10px;
+            }
+
+            .multiple-images img {
+                max-width: 45%;
+                max-height: 180px;
+            }
+
+            @@media print {
+                .page-border {
+                    display: block;
+                }
+            
+                body {
+                    padding: 180px 30px 100px 30px;
+                    padding-bottom: 0;
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                }
+
+                @@page {
+                    size: A4;
+                    margin: 0.5cm;
+                }
+
+                body::before {
+                    content: "CONTROLLED COPY";
+                    position: fixed;
+                    top: 40%;
+                    left: 25%;
+                    font-size: 60pt;
+                    color: rgba(200, 0, 0, 0.1);
+                    transform: rotate(-30deg);
+                    z-index: 9999;
+                }
+
+                .step-image, .key-point-image {
+                    max-height: 200px !important;
+                }
+
+                .instructions-cell { width: 35%; }
+                .image-cell { width: 30%; }
+                .key-points { width: 20%; }
+            
+                /* Print-specific page break controls */
+                .step-row {
+                    page-break-inside: avoid;
+                    break-inside: avoid;
+                }
+            
+                .step-content {
+                    page-break-inside: auto;
+                    break-inside: auto;
+                }
+            
+                /* Force page break before if content doesn't fit */
+                .instruction-table tr {
+                    page-break-inside: avoid;
+                }
+            
+                /* Allow rows to break across pages if needed */
+                .instruction-table {
+                    page-break-inside: auto;
+                }
+            
+                /* Ensure header appears on each page */
+                header {
+                    position: fixed;
+                    top: 0;
+                    display: block;
+                }
+            
+                /* Ensure footer appears on each page */
+                .footer-container {
+                    position: fixed;
+                    bottom: 0;
+                    display: block;
+                }
+                
+                .multiple-images {
+                    display: flex;
+                    flex-wrap: wrap;
+                    justify-content: center;
+                    gap: 8px;
+                }
+                
+                .multiple-images img {
+                    max-width: 45%;
+                    max-height: 160px;
+                }
+            }
+        
+            /* Hide border in screen view by default */
+            .page-border {
+                display: none;
+            }
+        
+            /* Print view will show borders */
+            @@media print {
+                .page-border {
+                    display: block;
+                }
+            }
+        
+            /* Optional: Add a class to show borders on screen for preview */
+            .show-borders .page-border {
+                display: block;
+            }
+
+            .key-points step-content {
+                position: relative;
+                min-height: 60px;
+                overflow: hidden; /* Clear the float */
+            }
+
+            .key-points img[style*="float: left"] {
+                max-width: 50px !important;
+                max-height: 50px !important;
+                margin-right: 10px !important;
+                margin-bottom: 5px !important;
+                float: left !important;
+                display: inline-block !important;
+            }
+
+        </style>
+    </head>
+
+
+    <body>
+
+    @if (User.Identity.IsAuthenticated)
+    {
+        <!-- Header -->
+        <header style="position: fixed; top: 0; left: 0; right: 0; height: 130px; padding: 9px 8px; background-color: white; z-index: 100;">
+            <table class="header-table">
+                <tr>
+                    <td rowspan="3" class="logo-cell" style="width: 20%;" height="135px">
+                        <img src="@($"{HttpContextAccessor.HttpContext.Request.Scheme}://{HttpContextAccessor.HttpContext.Request.Host}{HttpContextAccessor.HttpContext.Request.PathBase}/logo1.png")" class="logo" />
+                        <div style="font-size: 8pt; margin-top: 3px;">   TOYOTA TSUSHO </div>
+                        <div style="font-size: 8pt; margin-top: 3px;">SOUTH AFRICA PROCESSING</div>
+                       
+                    </td>
+                    <td class="doc-type" style="width: 50%;">@Model.DocType?.ToUpper()</td>
+                    <td class="doc-number" style="width: 25%;">SOP No: @Model.SopNumber?.ToUpper()</td>
+                </tr>
+                <tr>
+                    <td rowspan="2" class="doc-title" style="width: 50%;">@Model.Title</td>
+                    <td class="doc-revision-date" style="width: 25%;">
+                        <div><strong>Rev:</strong> @Model.Revision?.ToUpper()</div>
+                    </td>
+                </tr>
+                 <tr>
+                    <td class="doc-revision-date" style="width: 25%;">
+                        <div><strong>Date:</strong> @(Model.CreatedDate.ToString("dd/MMM/yyyy")?.ToUpper() ?? "")</div>
+                    </td>
+                </tr>
+            </table>
+        </header>
+
+       <!-- Main content -->
+        <div class="page-content" style="width:100%;">
+            <table class="instruction-table">
+                <thead>
+                    <tr>
+                        <th width="5%">No.</th>
+                        <th width="30%">INSTRUCTIONS</th>
+                        <th width="35%">VISUALS</th>
+                        <th width="30%">KEY POINTS / CONTACTS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var step in Model.Steps.OrderBy(s => s.StepNumber))
+                    {
+                        <tr class="step-row">
+                            <td style="text-align: center;"><strong>@step.StepNumber</strong>.</td>
+                            <td class="instructions-cell step-content">
+                                @Html.Raw(step.Instructions?.Replace("\n", "<br>"))
+                            </td>
+                            <td class="image-cell step-content">
+                                @if (!string.IsNullOrWhiteSpace(step.ImagePath))
+                                {
+                                    <div class="image-container">
+                                        @{
+                                            var imagePaths = step.ImagePath.Split(',');
+                                            if (imagePaths.Length > 1)
+                                            {
+                                                <div class="multiple-images">
+                                                    @foreach (var imgPath in imagePaths)
+                                                    {
+                                                        if (!string.IsNullOrWhiteSpace(imgPath))
+                                                        {
+                                                            if (IsBase64String(imgPath))
+                                                            {
+                                                                <img class="step-image" src="data:image/png;base64,@imgPath" alt="Step @step.StepNumber image" />
+                                                            }
+                                                            else
+                                                            {
+                                                                <img class="step-image" src="@GetPdfImagePath(imgPath)" alt="Step @step.StepNumber image" />
+                                                            }
+                                                        }
+                                                    }
+                                                </div>
+                                            }
+                                            else
+                                            {
+                                                var imgPath = imagePaths[0];
+                                                if (IsBase64String(imgPath))
+                                                {
+                                                    <img class="step-image" src="data:image/png;base64,@imgPath" alt="Step @step.StepNumber image" />
+                                                }
+                                                else
+                                                {
+                                                    <img class="step-image" src="@GetPdfImagePath(imgPath)" alt="Step @step.StepNumber image" />
+                                                }
+                                            }
+                                        }
+                                    </div>
+                                }
+                            </td>
+                            <td class="key-points step-content">
+                                <!-- Check for logos in Key Points content -->
+                                @{
+                                    var keyPointsContent = step.KeyPoints;
+                                    if (!string.IsNullOrWhiteSpace(keyPointsContent))
+                                    {
+                                        // Check if safety logo exists in content
+                                        if (keyPointsContent.Contains("/images/safety_logo.png"))
+                                        {
+                                            var safetyLogoPath = System.IO.Path.Combine(Env.WebRootPath, "images", "safety_logo.png");
+                                            if (System.IO.File.Exists(safetyLogoPath))
+                                            {
+                                                <img src="file:///@safetyLogoPath.Replace("\\", "/")" 
+                                                     style="max-width: 50px; max-height: 50px; margin-right: 10px; margin-bottom: 5px; float: left;" 
+                                                     alt="Safety Logo" />
+                                            }
+                                        }
+                                
+                                        // Check if quality logo exists in content
+                                        if (keyPointsContent.Contains("/images/quality_logo.png"))
+                                        {
+                                            var qualityLogoPath = System.IO.Path.Combine(Env.WebRootPath, "images", "quality_logo.png");
+                                            if (System.IO.File.Exists(qualityLogoPath))
+                                            {
+                                                <img src="file:///@qualityLogoPath.Replace("\\", "/")" 
+                                                     style="max-width: 50px; max-height: 50px; margin-right: 10px; margin-bottom: 5px; float: left;" 
+                                                     alt="Quality Logo" />
+                                            }
+                                        }
+                                
+                                        // Remove the logo image tags from the content before displaying
+                                        var cleanedContent = keyPointsContent
+                                            .Replace("<img src=\"/images/safety_logo.png\"", "<img removed>")
+                                            .Replace("<img src=\"/images/quality_logo.png\"", "<img removed>");
+                                    
+                                        // Remove any leftover img tags
+                                        cleanedContent = Regex.Replace(cleanedContent, @"<img[^>]*>", "", RegexOptions.IgnoreCase);
+                                
+                                        @Html.Raw(cleanedContent.Replace("\n", "<br>"))
+                                    }
+                                }
+                        
+                                @if (!string.IsNullOrWhiteSpace(step.KeyPointImagePath))
+                                {
+                                    <div class="image-container">
+                                        @if (IsBase64String(step.KeyPointImagePath))
+                                        {
+                                            <img class="key-point-image" src="data:image/png;base64,@step.KeyPointImagePath" alt="Key point @step.StepNumber image" />
+                                        }
+                                        else
+                                        {
+                                            <img class="key-point-image" src="@GetPdfImagePath(step.KeyPointImagePath)" alt="Key point @step.StepNumber image" />
+                                        }
+                                    </div>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="fas fa-sign-in-alt me-2"></i>Please 
+            <a asp-controller="Account" asp-action="Login">login</a> to access this page.
+        </div>
+    }
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const pageNumberSpans = document.querySelectorAll('.page-number');
+            const totalPages = document.querySelectorAll('.total-pages');
+            const total = 1; // Placeholder for now
+
+            pageNumberSpans.forEach(el => el.textContent = 1);
+            totalPages.forEach(el => el.textContent = total);
+        
+            // Add CSS for page breaks
+            const style = document.createElement('style');
+            style.textContent = `
+                @@media print {
+                    .step-row {
+                        page-break-inside: avoid;
+                        break-inside: avoid;
+                    }
+                
+                    .step-content {
+                        page-break-inside: auto;
+                        break-inside: auto;
+                    }
+                
+                    /* Allow content to flow to next page if it doesn't fit */
+                    .instruction-table {
+                        page-break-inside: auto;
+                    }
+                
+                    /* Prevent breaking within a step if possible */
+                    .step-row {
+                        break-inside: avoid;
+                    }
+                
+                    /* Show page borders in print */
+                    .page-border {
+                        display: block;
+                    }
+                }
+            `;
+            document.head.appendChild(style);
+        
+            // Optional: Add button to toggle border visibility for preview
+            const toggleBtn = document.createElement('button');
+            toggleBtn.textContent = 'Toggle Page Borders';
+            toggleBtn.style.position = 'fixed';
+            toggleBtn.style.top = '10px';
+            toggleBtn.style.right = '10px';
+            toggleBtn.style.zIndex = '1000';
+            toggleBtn.style.padding = '5px 10px';
+            toggleBtn.addEventListener('click', function() {
+                document.body.classList.toggle('show-borders');
+            });
+        
+            // Only add the button for authenticated users
+            @if (User.Identity.IsAuthenticated)
+            {
+                @:document.body.appendChild(toggleBtn);
+            }
+        });
+    </script>
+
+    </body>
+</html>
+
+            
+@functions {
+    // For PDF generation - provides absolute file paths that wkhtmltopdf can access
+    string GetPdfImagePath(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+            return null;
+
+        try
+        {
+            var fileName = System.IO.Path.GetFileName(relativePath);
+            var basePath = Configuration["StorageSettings:BasePath"];
+            
+            if (!string.IsNullOrEmpty(basePath))
+            {
+                // Determine the folder based on the path content
+                string subFolder = relativePath.Contains("StructuredSop/keypoints") ? 
+                    "StructuredSop/keypoints" : "StructuredSop/instructions";
+                
+                var fullPath = System.IO.Path.Combine(basePath, subFolder, fileName);
+                
+                if (System.IO.File.Exists(fullPath))
+                {
+                    // Return absolute file path for PDF generator
+                    return $"file:///{fullPath.Replace("\\", "/")}";
+                }
+            }
+            
+            // Fallback to legacy location
+            var legacySubFolder = relativePath.Contains("StructuredSop/keypoints") ?
+                "Documents/StructuredSop/keypoints" : "Documents/StructuredSop/instructions";
+                
+            var legacyPath = System.IO.Path.Combine(Env.WebRootPath, legacySubFolder, fileName);
+            if (System.IO.File.Exists(legacyPath))
+            {
+                return $"file:///{legacyPath.Replace("\\", "/")}";
+            }
+            
+            return null;
+        }
+        catch (Exception ex)
+        {
+            // Log error if needed
+            return null;
+        }
+    }
+
+    // For web display - uses FileAccess controller URLs
+    string GetFilePath(string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath))
+            return null;
+
+        try
+        {
+            // For new storage system, use FileAccess controller URLs
+            var fileName = System.IO.Path.GetFileName(relativePath);
+            
+            // Determine the file type based on the path
+            if (relativePath.Contains("StructuredSop/instructions"))
+            {
+                return Url.Action("GetStructuredImage", "FileAccess", new { fileName = fileName, type = "instructions" });
+            }
+            else if (relativePath.Contains("StructuredSop/keypoints"))
+            {
+                return Url.Action("GetStructuredImage", "FileAccess", new { fileName = fileName, type = "keypoints" });
+            }
+            else
+            {
+                // Fallback to direct file path (for migration period)
+                var basePath = Configuration["StorageSettings:BasePath"];
+                if (!string.IsNullOrEmpty(basePath))
+                {
+                    var fullPath = System.IO.Path.Combine(basePath, relativePath.TrimStart('\\', '/').Replace("/", "\\"));
+                    if (System.IO.File.Exists(fullPath))
+                    {
+                        return fullPath;
+                    }
+                }
+                
+                // Final fallback to legacy path
+                var legacyPath = System.IO.Path.Combine(Env.ContentRootPath, "wwwroot", relativePath.TrimStart('\\', '/').Replace("/", "\\"));
+                return new Uri(legacyPath).AbsoluteUri;
+            }
+        }
+        catch (Exception ex)
+        {
+            // Log error if needed
+            return null;
+        }
+    }
+
+    bool IsBase64String(string s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return false;
+        s = s.Trim();
+        return (s.Length % 4 == 0) && Regex.IsMatch(s, @"^[a-zA-Z0-9\+/]*={0,3}$", RegexOptions.None);
+    }
+}

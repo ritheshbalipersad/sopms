@@ -1,0 +1,107 @@
+﻿@model SOPMSApp.Models.StructuredSop
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <style>
+            body {
+                margin: 0;
+                padding: 0;
+                font-family: Arial, sans-serif;
+                font-size: 12pt;
+            }
+
+            .footer-table {
+                width: 100%;
+                border-collapse: collapse;
+                font-size: 12pt;
+               
+            }
+
+            .uncontrolled-warning {
+                text-align: center;
+                font-style: italic;
+                font-size: 12pt;
+                margin-top: 5px;
+                font-weight: bold;
+                color: red;
+            }
+
+            .footer-cell {
+                border: 1px solid black;
+                padding: 5px;
+            }
+
+        </style>
+    </head>
+
+    <body>
+        <table class="footer-table">
+            <tr>
+                <td class="footer-cell">
+                    <strong>Controlled By:</strong>
+                </td>
+                <td class="footer-cell">
+                    @Model.ControlledBy
+                </td>
+                <td class="footer-cell">
+                    <strong>Approved By:</strong>
+                </td>
+                <td class="footer-cell">
+                     @Model.ApprovedBy
+                </td>
+                <td rowspan="4" class="footer-cell" style="width: 11%;">
+                
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" class="footer-cell" style="text-align:center;">
+                 <strong>Approved Date:</strong>
+                    <span class="date">
+                    @(Model.EffectiveDate != null ? ((DateTime)Model.AdminApprovedDate).ToString("dd MMMM, yyyy") : "Not Set")
+                        </span><br />
+                </td>
+                <td colspan="2" class="footer-cell" style="text-align:center;">
+                    <strong> Next Review Date:</strong>
+                    <span class="date">
+                        @(Model.EffectiveDate != null ? ((DateTime)Model.EffectiveDate).ToString("dd MMMM, yyyy")   : "Not Set")
+                    </span><br />
+                </td>
+            </tr>
+
+        </table>
+        <div class="uncontrolled-warning">
+            UNCONTROLLED WHEN PRINTED WITHOUT RED CONTROLLED STAMP &amp; SIGNATURES
+        </div>
+
+    <script type="text/javascript">
+        // This script will be executed by wkhtmltopdf
+        var pdfPageCount = 0;
+
+        function substitutePdfVariables() {
+            try {
+                // wkhtmltopdf provides these variables
+                document.querySelectorAll('.page').forEach(function(element) {
+                    element.textContent = typeof page !== 'undefined' ? page : '1';
+                });
+
+                document.querySelectorAll('.topage').forEach(function(element) {
+                    element.textContent = typeof topage !== 'undefined' ? topage : '1';
+                });
+            } catch(e) {
+                console.error('Error setting page numbers:', e);
+            }
+
+        }
+
+        // Run when document is loaded
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', substitutePdfVariables);
+        } else {
+            substitutePdfVariables();
+        }
+    </script>
+
+    </body>
+
+</html>

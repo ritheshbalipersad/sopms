@@ -1,0 +1,47 @@
+html {
+  font-size: 14px;
+}
+
+@media (min-width: 768px) {
+  html {
+    font-size: 16px;
+  }
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+}
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  margin-bottom: 60px;
+}
+
+.upload-container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.tab-container {
+    margin-top: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+}
+
+.nav-tabs {
+    margin-bottom: 15px;
+}
+
+.tab-content {
+    padding: 15px 0;
+}
+
+#metadataDisplay {
+    min-height: 200px;
+}

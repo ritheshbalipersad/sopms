@@ -1,0 +1,1384 @@
+﻿@{
+    ViewData["Title"] = "Upload SOP File";
+}
+
+@if (User.Identity.IsAuthenticated)
+{
+    <div class="container-fluid">
+        <form asp-action="UploadFile" asp-controller="FileUpload" method="post" enctype="multipart/form-data" id="uploadForm" class="needs-validation" novalidate>
+            <div class="row justify-content-center my-5">
+                <div class="col-lg-10 col-xl-8">
+                    <!-- Card Container -->
+                    <div class="card shadow-lg border-0 rounded-4 overflow-hidden">
+                        <!-- Card Header -->
+                        <header class="card-header bg-primary-gradient text-white rounded-top-4 py-4">
+                            <div class="d-flex align-items-center justify-content-center">
+                                <i class="fas fa-file-upload fa-2x me-3" aria-hidden="true"></i>
+                                <h1 class="h2 mb-0">SOP Document Upload</h1>
+                            </div>
+                        </header>
+
+                        <!-- Card Body -->
+                        <main class="card-body px-5 py-4">
+                            <!-- Alert Messages -->
+                            <section class="alert-container mb-4" aria-live="polite">
+                                @if (TempData["PendingUpload"] != null && (bool)TempData["PendingUpload"])
+                                {
+                                    <div class="alert alert-danger border-warning">
+                                        <strong>Duplicate Detected:</strong> @TempData["ConflictMessage"]
+                                        <div class="mt-3">
+                                            <button type="button" class="btn btn-secondary ms-2" data-bs-dismiss="alert">CLOSE</button>
+                                        </div>
+                                    </div>
+                                }
+
+                                @if (TempData["Success"] != null)
+                                {
+                                    <div class="alert alert-success alert-dismissible fade show d-flex align-items-center">
+                                        <i class="fas fa-check-circle fa-lg me-3" aria-hidden="true"></i>
+                                        <div>@TempData["Success"]</div>
+                                        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>
+                                }
+                                @if (TempData["Warning"] != null)
+                                {
+                                    <div class="alert alert-warning alert-dismissible fade show d-flex align-items-center">
+                                        <i class="fas fa-exclamation-triangle fa-lg me-3" aria-hidden="true"></i>
+                                        <div>@TempData["Warning"]</div>
+                                        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>
+                                }
+                                @if (TempData["Error"] != null)
+                                {
+                                    <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center">
+                                        <i class="fas fa-exclamation-circle fa-lg me-3" aria-hidden="true"></i>
+                                        <div>@TempData["Error"]</div>
+                                        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+                                    </div>
+                                }
+                            </section>
+
+                            <!-- Form Grid -->
+                            <div class="row g-3">
+                                <!-- File Upload Section -->
+                                <div class="col-12">
+                                    <div class="card border-0 shadow-sm mb-3">
+                                        <div class="card-header bg-primary text-white py-2">
+                                            <h6 class="mb-0 d-flex align-items-center">
+                                                <i class="fas fa-upload me-2 fs-6"></i>File Uploads
+                                            </h6>
+                                        </div>
+                                        <div class="card-body p-3">
+                                            <div class="row g-3">
+                                                <!-- Original Document -->
+                                                <div class="col-md-6">
+                                                    <div class="file-upload-card border rounded-2 p-3 h-100">
+                                                        <div class="d-flex align-items-center mb-2">
+                                                            <div class="icon-wrapper bg-primary bg-opacity-10 rounded-circle p-2 me-2">
+                                                                <i class="fas fa-file-alt text-primary fs-5"></i>
+                                                            </div>
+                                                            <div class="flex-grow-1">
+                                                                <h6 class="mb-0 fw-semibold">Original Document</h6>
+                                                                <span class="badge bg-danger fs-7">Required</span>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="file-upload-wrapper" id="originalFileWrapper">
+                                                            <input type="file" name="OriginalFile" class="form-control file-upload-input"
+                                                                   id="originalFileInput" required
+                                                                   accept=".doc,.docx,.dot,.dotx,.xls,.xlsx,.xlt,.xltx,.ppt,.pptx,.pot,.potx,.pdf"
+                                                                   onchange="validateFileSelection(this)" />
+                                                            <div class="file-upload-mask text-center py-3">
+                                                                <div class="upload-icon mb-2">
+                                                                    <i class="fas fa-cloud-upload-alt fa-2x text-muted"></i>
+                                                                </div>
+                                                                <p class="file-upload-text mb-1 fw-medium fs-6">Drop file or click to upload</p>
+                                                                <p class="text-muted fs-7 mb-0">Max 100MB • DOC, DOCX, XLS, XLSX, PPT, PDF</p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="mt-2">
+                                                            <small id="originalFileName" class="text-success fw-medium file-name d-block fs-7"></small>
+                                                            <div id="originalFileError" class="invalid-feedback d-block mt-1 fs-7"></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Optional Files -->
+                                                <div class="col-md-6">
+                                                    <div class="row g-2 h-100">
+                                                        <!-- PDF Version -->
+                                                        <div class="col-12">
+                                                            <div class="file-upload-card border rounded-2 p-2 h-100">
+                                                                <div class="d-flex align-items-center mb-1">
+                                                                    <div class="icon-wrapper bg-danger bg-opacity-10 rounded-circle p-1 me-2">
+                                                                        <i class="fas fa-file-pdf text-danger fs-6"></i>
+                                                                    </div>
+                                                                    <div class="flex-grow-1">
+                                                                        <h6 class="mb-0 fw-semibold fs-6">PDF Version</h6>
+                                                                        <span class="badge bg-secondary fs-7">Optional</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="file-upload-wrapper" id="pdfFileWrapper">
+                                                                    <input type="file" name="PdfFile" class="form-control file-upload-input"
+                                                                           id="pdfFileInput" accept=".pdf"
+                                                                           onchange="updateFileName('pdfFileInput', 'pdfFileName')" />
+                                                                    <div class="file-upload-mask py-1 px-2">
+                                                                        <i class="fas fa-plus-circle text-muted me-1 fs-6"></i>
+                                                                        <span class="file-upload-text fs-6">Add PDF</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <small id="pdfFileName" class="text-muted mt-1 d-block fs-7"></small>
+                                                            </div>
+                                                        </div>
+
+                                                        <!-- Training Video -->
+                                                        <div class="col-12">
+                                                            <div class="file-upload-card border rounded-2 p-2 h-100">
+                                                                <div class="d-flex align-items-center mb-1">
+                                                                    <div class="icon-wrapper bg-info bg-opacity-10 rounded-circle p-1 me-2">
+                                                                        <i class="fas fa-video text-info fs-6"></i>
+                                                                    </div>
+                                                                    <div class="flex-grow-1">
+                                                                        <h6 class="mb-0 fw-semibold fs-6">Training Video</h6>
+                                                                        <span class="badge bg-secondary fs-7">Optional</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="file-upload-wrapper" id="videoFileWrapper">
+                                                                    <input type="file" name="VideoFile" class="form-control file-upload-input"
+                                                                           id="videoFileInput" accept="video/*"
+                                                                           onchange="updateFileName('videoFileInput', 'videoFileName')" />
+                                                                    <div class="file-upload-mask py-1 px-2">
+                                                                        <i class="fas fa-plus-circle text-muted me-1 fs-6"></i>
+                                                                        <span class="file-upload-text fs-6">Add Video</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <small id="videoFileName" class="text-muted mt-1 d-block fs-7"></small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Document Information -->
+                                <div class="col-12">
+                                    <div class="card border-0 shadow-sm mb-3">
+                                        <div class="card-header bg-primary text-white py-2">
+                                            <h6 class="mb-0 d-flex align-items-center">
+                                                <i class="fas fa-file-contract me-2 fs-6"></i>Document Information
+                                            </h6>
+                                        </div>
+                                        <div class="card-body p-3">
+                                            <div class="row g-3">
+                                                <!-- Document Type & SOP Number -->
+                                                <div class="col-lg-6">
+                                                    <div class="row g-2">
+                                                        <!-- Document Type -->
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 d-flex align-items-center fs-6">
+                                                                <i class="fas fa-book text-primary me-1 fs-6"></i>
+                                                                Document Type <span class="text-danger ms-1">*</span>
+                                                            </label>
+                                                            <select class="form-select" name="docType" id="docTypeSelect" required>
+                                                                <option value="" disabled selected>Select Document Type</option>
+                                                                @if (ViewData["Documents"] != null)
+                                                                {
+                                                                    foreach (var docType in (List<string>)ViewData["Documents"])
+                                                                    {
+                                                                        <option value="@docType">@docType</option>
+                                                                    }
+                                                                }
+                                                            </select>
+                                                            <div class="invalid-feedback fs-7">Please select a document type</div>
+                                                        </div>
+
+                                                        <!-- SOP Number -->
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 d-flex align-items-center fs-6">
+                                                                <i class="fas fa-hashtag text-primary me-1 fs-6"></i>
+                                                                SOP Number <span class="text-danger ms-1">*</span>
+                                                            </label>
+                                                            <div class="input-group">
+                                                                <input type="text" name="sopNumber" id="sopNumberInput"
+                                                                       class="form-control" placeholder="Will be auto-generated"
+                                                                       pattern="[A-Za-z0-9\-]+" title="Alphanumeric characters and hyphens only" />
+                                                                <button type="button" class="btn btn-primary btn-sm" id="generateSopBtn">
+                                                                    <i class="fas fa-magic me-1"></i>Generate
+                                                                </button>
+                                                            </div>
+                                                            <div class="mt-1">
+                                                                <small class="text-muted d-flex align-items-center fs-7">
+                                                                    <i class="fas fa-info-circle me-1 fs-7"></i>
+                                                                    Leave empty and click "Generate" for auto-numbering
+                                                                </small>
+                                                            </div>
+                                                            <div class="invalid-feedback fs-7">Please provide a valid SOP number</div>
+                                                            @if (ViewData.ModelState["sopNumber"]?.Errors.Count > 0)
+                                                            {
+                                                                <div class="invalid-feedback d-block fs-7">
+                                                                    @ViewData.ModelState["sopNumber"].Errors[0].ErrorMessage
+                                                                </div>
+                                                            }
+                                                        </div>
+
+                                                        <!-- Revision -->
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 d-flex align-items-center fs-6">
+                                                                <i class="fas fa-edit text-primary me-1 fs-6"></i>
+                                                                Revision <span class="text-danger ms-1">*</span>
+                                                            </label>
+                                                            <input type="text" name="revision" class="form-control"
+                                                                   placeholder="01, 02, etc." required pattern="\d{2}"
+                                                                   title="Must be 2 digits (e.g., 01)" />
+                                                            <div class="invalid-feedback fs-7">Please enter a 2-digit revision number</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Author & Department -->
+                                                <div class="col-lg-6">
+                                                    <div class="row g-2">
+                                                        <!-- Uploaded By -->
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 d-flex align-items-center fs-6">
+                                                                <i class="fas fa-user text-primary me-1 fs-6"></i>
+                                                                Uploaded By
+                                                            </label>
+                                                            <div class="input-group">
+                                                                <span class="input-group-text bg-light py-1">
+                                                                    <i class="fas fa-user-check text-muted fs-6"></i>
+                                                                </span>
+                                                                <input type="text" name="author" class="form-control bg-light py-1"
+                                                                       value="@User.FindFirst("LaborName")?.Value" readonly />
+                                                            </div>
+                                                        </div>
+
+                                                        <!-- Department -->
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 d-flex align-items-center fs-6">
+                                                                <i class="fas fa-building text-primary me-1 fs-6"></i>
+                                                                Department <span class="text-danger ms-1">*</span>
+                                                            </label>
+                                                            <select class="form-select" name="department" required>
+                                                                <option value="" disabled selected>Select Department</option>
+                                                                @if (ViewData["Department"] != null)
+                                                                {
+                                                                    var userDepartment = ViewBag.UserDepartment;
+                                                                    foreach (var department in (List<DepartmentModel>)ViewData["Department"])
+                                                                    {
+                                                                        <option value="@department.DepartmentName" selected="@(department.DepartmentID == userDepartment ? "selected" : null)">
+                                                                            @department.DepartmentName
+                                                                        </option>
+                                                                    }
+                                                                }
+                                                            </select>
+                                                            <div class="invalid-feedback fs-7">Please select a department</div>
+                                                        </div>
+
+                                                        <!-- Description -->
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 d-flex align-items-center fs-6">
+                                                                <i class="fas fa-file-alt text-primary me-1 fs-6"></i>
+                                                                Document Description <span class="text-danger ms-1">*</span>
+                                                            </label>
+                                                            <textarea name="documentType" class="form-control"
+                                                                  placeholder="Enter document description here..."
+                                                                  rows="3" required></textarea>
+                                                            <div class="invalid-feedback fs-7">Please provide a description</div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Dates & Review Frequency -->
+                                <div class="col-12">
+                                    <div class="card border-0 shadow-sm mb-3">
+                                        <div class="card-header bg-primary text-white py-2">
+                                            <h6 class="mb-0 d-flex align-items-center">
+                                                <i class="fas fa-calendar-alt me-2 fs-6"></i>Review Schedule
+                                            </h6>
+                                        </div>
+                                        <div class="card-body p-3">
+                                            <div class="row g-3">
+                                                <!-- Dates -->
+                                                <div class="col-lg-6">
+                                                    <div class="row g-2">
+                                                        <!-- Last Review Date -->
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 d-flex align-items-center fs-6">
+                                                                <i class="fas fa-calendar-day text-primary me-1 fs-6"></i>
+                                                                Last Review Date <span class="text-danger ms-1">*</span>
+                                                            </label>
+                                                            <input type="date" name="lastReviewDate" class="form-control"
+                                                                   max="@DateTime.Now.ToString("yyyy-MM-dd")" required
+                                                                   onchange="validateDate(this)" />
+                                                            <div class="invalid-feedback fs-7">Please select a valid review date</div>
+                                                        </div>
+
+                                                        <!-- Next Review Date -->
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 d-flex align-items-center fs-6">
+                                                                <i class="fas fa-calendar-check text-primary me-1 fs-6"></i>
+                                                                Next Review Date
+                                                            </label>
+                                                            <div class="input-group">
+                                                                <span class="input-group-text bg-light py-1">
+                                                                    <i class="fas fa-calendar text-muted fs-6"></i>
+                                                                </span>
+                                                                <input type="date" name="effectiveDate" id="effectiveDate"
+                                                                       class="form-control bg-light py-1" readonly />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                <!-- Review Frequency -->
+                                                <div class="col-lg-6">
+                                                    <label class="form-label fw-semibold mb-2 d-flex align-items-center fs-6">
+                                                        <i class="fas fa-clock text-primary me-1 fs-6"></i>
+                                                        Review Frequency
+                                                    </label>
+                                                    <div class="frequency-selector p-2 border rounded-2 bg-light-subtle">
+                                                        <div class="row g-1">
+                                                            @for (int i = 1; i <= 7; i++)
+                                                            {
+                                                                <div class="col-4 col-md-3 col-lg-4">
+                                                                    <input type="radio" class="btn-check" name="yearOption"
+                                                                           id="yearOption@(i)" value="@i" onclick="setEffectiveDate(@i)"
+                                                                           @(i == 1 ? "checked" : "") />
+                                                                    <label class="btn btn-outline-primary w-100 mb-0 py-1 fs-7" for="yearOption@(i)">
+                                                                        @i Year@(i > 1 ? "s" : "")
+                                                                    </label>
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Applicable Areas -->
+                                <div class="col-12">
+                                    <div class="card border-0 shadow-sm mb-3">
+                                        <div class="card-header bg-primary text-white py-2">
+                                            <h6 class="mb-0 d-flex align-items-center">
+                                                <i class="fas fa-map-marker-alt me-2 fs-6"></i>
+                                                Applicable Areas <span class="text-danger ms-1">*</span>
+                                            </h6>
+                                        </div>
+                                        <div class="card-body p-3">
+                                            <div class="row g-2" id="areaCheckboxGroup">
+                                                @foreach (var areaName in (List<string>)ViewData["Areas"])
+                                                {
+                                                    <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+                                                        <div class="form-check card-checkbox p-0">
+                                                            <input class="form-check-input area-checkbox" type="checkbox"
+                                                                   name="Area" id="area_@areaName" value="@areaName" />
+                                                            <label class="form-check-label w-100 h-100 p-2 border rounded-2 fs-7" for="area_@areaName">
+                                                                <div class="d-flex align-items-center">
+                                                                    <div class="checkbox-icon me-1">
+                                                                        <i class="fas fa-map-pin fs-7"></i>
+                                                                    </div>
+                                                                    <span class="text-truncate">@areaName</span>
+                                                                </div>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                }
+                                            </div>
+                                            <span class="text-danger mt-2 d-none d-flex align-items-center fs-7" id="areaError">
+                                                <i class="fas fa-exclamation-circle me-1 fs-7"></i>Please select at least one area
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Submit Button -->
+                                <input type="hidden" id="OverrideConfirmed" name="overrideConfirmed" value="false" />
+                                <div class="col-12">
+                                    <div class="d-grid">
+                                        <button type="submit" class="btn btn-primary py-2 shadow-sm">
+                                            <i class="fas fa-cloud-upload-alt me-2"></i>Upload Document
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </main>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+}
+else
+{
+    <div class="alert alert-info">
+        <i class="fas fa-sign-in-alt me-2"></i>Please <a asp-controller="Account" asp-action="Login">login</a> to access this page.
+    </div>
+}
+
+@section Scripts {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            initializeForm();
+            initializeSopNumberGeneration();
+        });
+
+        async function generateSopNumber() {
+            const docTypeSelect = document.getElementById('docTypeSelect');
+            const sopNumberInput = document.getElementById('sopNumberInput');
+            const generateBtn = document.getElementById('generateSopBtn');
+
+            if (!docTypeSelect.value) {
+                showToast('Please select a Document Type first', 'error');
+                return;
+            }
+
+            const originalText = generateBtn.innerHTML;
+            generateBtn.innerHTML = originalText;
+            generateBtn.disabled = false;
+
+            try {
+                const url = '@Url.Action("GetSopNumber", "FileUpload")';
+                const response = await fetch(`${url}?docType=${encodeURIComponent(docTypeSelect.value)}`);
+
+                const data = await response.json();
+
+                if (data.sopNumber) {
+                    sopNumberInput.value = data.sopNumber;
+                    showToast('SOP number generated successfully!', 'success');
+                } else {
+                    showToast('Failed to generate SOP number', 'error');
+                }
+            } catch (e) {
+                showToast('Error generating SOP number', 'error');
+            } finally {
+                generateBtn.innerHTML = originalText;
+                generateBtn.disabled = false;
+            }
+        }
+
+        // Initialize SOP number generation functionality
+        function initializeSopNumberGeneration() {
+            const generateBtn = document.getElementById('generateSopBtn');
+            const docTypeSelect = document.getElementById('docTypeSelect');
+            const sopNumberInput = document.getElementById('sopNumberInput');
+
+            if (!generateBtn || !docTypeSelect || !sopNumberInput) {
+                console.warn('SOP number generation elements not found');
+                return;
+            }
+
+            // Attach click event to generate button
+            generateBtn.addEventListener('click', generateSopNumber);
+
+            // Auto-generate when document type changes
+            docTypeSelect.addEventListener('change', function() {
+                // Only auto-generate if SOP number is empty
+                if (!sopNumberInput.value.trim()) {
+                    setTimeout(() => generateSopNumber(), 300); // Small delay
+                }
+            });
+
+            // Auto-generate on page load if document type is already selected
+            if (docTypeSelect.value && !sopNumberInput.value.trim()) {
+                setTimeout(() => generateSopNumber(), 500);
+            }
+
+            // Clear validation on input
+            sopNumberInput.addEventListener('input', function() {
+                this.classList.remove('is-invalid', 'is-valid');
+            });
+        }
+
+        // Show toast notification
+        function showToast(message, type = 'info') {
+            // Remove existing toasts
+            const existingToasts = document.querySelectorAll('.toast-container');
+            existingToasts.forEach(toast => toast.remove());
+
+            // Create toast element
+            const toast = document.createElement('div');
+            toast.className = `toast-container position-fixed top-0 end-0 p-3`;
+            toast.style.zIndex = '1050';
+
+            const toastInner = document.createElement('div');
+            toastInner.className = `toast align-items-center text-white bg-${type === 'success' ? 'success' : 'danger'} border-0`;
+            toastInner.setAttribute('role', 'alert');
+            toastInner.setAttribute('aria-live', 'assertive');
+            toastInner.setAttribute('aria-atomic', 'true');
+
+            const toastBody = document.createElement('div');
+            toastBody.className = 'd-flex';
+
+            toastBody.innerHTML = `
+                <div class="toast-body">
+                    <i class="fas fa-${type === 'success' ? 'check-circle' : 'exclamation-circle'} me-2"></i>
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            `;
+
+            toastInner.appendChild(toastBody);
+            toast.appendChild(toastInner);
+            document.body.appendChild(toast);
+
+            // Show toast
+            const bsToast = new bootstrap.Toast(toastInner);
+            bsToast.show();
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => bsToast.hide(), 5000);
+        }
+
+                // Form initialization and validation
+        function initializeForm() {
+            const form = document.getElementById("uploadForm");
+            const overrideInput = document.getElementById("OverrideConfirmed");
+
+            if (!form) return;
+
+            // Get submit button and store original HTML
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const originalBtnHTML = submitBtn ? submitBtn.innerHTML : '';
+
+            // Function to restore button to original state
+            function restoreButton() {
+                submitBtn.innerHTML = originalBtnHTML;
+                submitBtn.disabled = false;
+            }
+
+            form.addEventListener('submit', async function handleFormSubmit(e) {
+                e.preventDefault();
+                const submitter = e.submitter;
+
+                // If this is an override submission, skip duplicate check
+                if (submitter && submitter.name === "overrideConfirmed") {
+                    overrideInput.value = "true";
+                    // Change button to processing state
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+                    submitBtn.disabled = true;
+
+                    // Allow form to submit normally (will cause page reload)
+                    setTimeout(() => {
+                        form.removeEventListener('submit', handleFormSubmit);
+                        form.submit();
+                    }, 100);
+                    return;
+                }
+
+                // SOP number validation - RESTORE BUTTON IF FAILS
+                const sopNumberInput = document.getElementById('sopNumberInput');
+                if (!sopNumberInput || !sopNumberInput.value.trim()) {
+                    showToast('Please generate or enter an SOP number', 'error');
+                    sopNumberInput?.focus();
+                    restoreButton(); // RESTORE HERE
+                    return;
+                }
+
+                // File validation - RESTORE BUTTON IF FAILS
+                if (!validateFileSelection(document.getElementById('originalFileInput'))) {
+                    restoreButton(); // RESTORE HERE
+                    return;
+                }
+
+                // Area checkbox validation - RESTORE BUTTON IF FAILS
+                const checkboxes = document.querySelectorAll(".area-checkbox");
+                const areaChecked = Array.from(checkboxes).some(cb => cb.checked);
+                const errorSpan = document.getElementById("areaError");
+                if (!areaChecked) {
+                    errorSpan.classList.remove("d-none");
+                    errorSpan.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    restoreButton(); // RESTORE HERE
+                    return;
+                }
+
+                // HTML5 validation - RESTORE BUTTON IF FAILS
+                if (!form.checkValidity()) {
+                    form.classList.add('was-validated');
+                    restoreButton(); // RESTORE HERE
+                    return;
+                }
+
+                // ALL VALIDATION PASSED - Now show processing state
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+                submitBtn.disabled = true;
+
+                // Prepare data for duplicate check
+                let sopNumber = sopNumberInput.value;
+                let originalFile = document.getElementById('originalFileInput').value.split("\\").pop();
+                let revision = document.querySelector("input[name='revision']")?.value || "";
+                let department = document.querySelector("select[name='department']")?.value || "";
+
+                try {
+                    // Call server duplicate check using fetch API
+                    const response = await fetch("/FileUpload/CheckDuplicate", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({ sopNumber, originalFile, revision, department })
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+
+                    if (data.isDuplicate) {
+                        // Restore button before showing confirmation
+                        restoreButton();
+
+                        // Show custom modal or confirm instead of alert
+                        if (confirm(data.message + "\n\nDo you want to proceed anyway?")) {
+                            // If user confirms, change back to processing and submit
+                            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+                            submitBtn.disabled = true;
+
+                            overrideInput.value = "true";
+
+                            // Submit with fallback
+                            setTimeout(() => {
+                                form.removeEventListener('submit', handleFormSubmit);
+                                form.submit();
+
+                                // Fallback: restore button after 5 seconds if page doesn't reload
+                                setTimeout(restoreButton, 5000);
+                            }, 100);
+                        }
+                    } else {
+                        // Safe to submit - remove listener and submit
+                        form.removeEventListener('submit', handleFormSubmit);
+                        form.submit();
+
+                        // Fallback restoration in case submission fails
+                        setTimeout(restoreButton, 5000);
+                    }
+                } catch (error) {
+                    // Restore button on error
+                    restoreButton();
+                    showToast('Error checking for duplicates. Please try again.', 'error');
+                    console.error('Duplicate check error:', error);
+                }
+            });
+        }
+
+        function updateFileName(inputId, displayId) {
+            const input = document.getElementById(inputId);
+            const display = document.getElementById(displayId);
+
+            if (input.files.length > 0) {
+                display.textContent = input.files[0].name;
+                display.classList.add('text-success');
+                display.classList.remove('text-muted');
+            } else {
+                display.textContent = '';
+            }
+        }
+
+        function setEffectiveDate(yearsToAdd) {
+            const lastReviewInput = document.querySelector("input[name='lastReviewDate']");
+            const effectiveDateInput = document.getElementById("effectiveDate");
+
+            if (!lastReviewInput || !lastReviewInput.value) return;
+
+            const lastReviewDate = new Date(lastReviewInput.value);
+            if (isNaN(lastReviewDate)) return;
+
+            lastReviewDate.setFullYear(lastReviewDate.getFullYear() + yearsToAdd);
+            effectiveDateInput.value = lastReviewDate.toISOString().split("T")[0];
+        }
+
+        function validateDate(input) {
+            const selectedDate = new Date(input.value);
+            const today = new Date();
+
+            if (selectedDate > today) {
+                input.setCustomValidity('Date cannot be in the future');
+                input.reportValidity();
+            } else {
+                input.setCustomValidity('');
+                const selectedYearOption = document.querySelector('input[name="yearOption"]:checked');
+                if (selectedYearOption) {
+                    setEffectiveDate(parseInt(selectedYearOption.value));
+                }
+            }
+        }
+
+        
+
+        function validateFileSelection(input) {
+            const wrapper = input.closest('.file-upload-wrapper');
+            const fileNameDisplay = document.getElementById('originalFileName');
+            const errorDisplay = document.getElementById('originalFileError');
+
+            wrapper.classList.remove('is-invalid', 'is-valid');
+            errorDisplay.textContent = '';
+
+            if (input.files && input.files.length > 0) {
+                const file = input.files[0];
+                const fileExt = file.name.split('.').pop().toLowerCase();
+                const allowedExts = [
+                  'doc', 'docx', 'dot', 'dotx',
+                  'xls', 'xlsx', 'xlt', 'xltx',
+                  'ppt', 'pptx', 'pot', 'potx',
+                  'pdf'
+                ];
+
+                if (!allowedExts.includes(fileExt)) {
+                    wrapper.classList.add('is-invalid');
+                    errorDisplay.textContent = 'Invalid file type. Please select a Word, Excel, or PDF file.';
+                    input.value = '';
+                    fileNameDisplay.textContent = '';
+                    return false;
+                }
+
+                const maxSize = 100 * 1024 * 1024;
+                if (file.size > maxSize) {
+                    wrapper.classList.add('is-invalid');
+                    errorDisplay.textContent = 'File size exceeds 100MB limit.';
+                    input.value = '';
+                    fileNameDisplay.textContent = '';
+                    return false;
+                }
+
+                wrapper.classList.add('is-valid');
+                fileNameDisplay.textContent = file.name;
+                return true;
+            }
+
+            wrapper.classList.add('is-invalid');
+            errorDisplay.textContent = 'Please select a file.';
+            return false;
+        }
+
+        // Drag & drop functions
+        const pdfDropArea = document.getElementById('pdfFileWrapper');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            pdfDropArea?.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            pdfDropArea?.addEventListener(eventName, () => pdfDropArea.classList.add('highlight'), false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            pdfDropArea?.addEventListener(eventName, () => pdfDropArea.classList.remove('highlight'), false);
+        });
+
+        pdfDropArea?.addEventListener('drop', function (e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            const input = document.getElementById('pdfFileInput');
+
+            if (files.length) {
+                const file = files[0];
+                if (file.name.toLowerCase().endsWith(".pdf")) {
+                    input.files = files;
+                    updateFileName('pdfFileInput', 'pdfFileName');
+                } else {
+                    showToast("Only PDF files are allowed here.", "error");
+                }
+            }
+        });
+
+        const dropArea = document.getElementById('originalFileWrapper');
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropArea?.addEventListener(eventName, preventDefaults, false);
+            document.body.addEventListener(eventName, preventDefaults, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropArea?.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropArea?.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight() {
+            dropArea?.classList.add('highlight');
+        }
+
+        function unhighlight() {
+            dropArea?.classList.remove('highlight');
+        }
+
+        dropArea?.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            const input = document.getElementById('originalFileInput');
+
+            if (files.length) {
+                input.files = files;
+                validateFileSelection(input);
+            }
+        }
+
+        // Fix for SOP number generation button state
+        // Ensure the button always has the correct spinner HTML
+        const originalGenerateBtnText = document.getElementById('generateSopBtn')?.innerHTML;
+        if (originalGenerateBtnText) {
+            document.getElementById('generateSopBtn').setAttribute('data-original-text', originalGenerateBtnText);
+        }
+    </script>
+}
+<!-- Styles -->
+@section Styles {
+    <style>
+        :root {
+            /* Color variables */
+            --sidebar-width: 250px;
+            --sidebar-bg: #2c3e50;
+            --sidebar-text: #ffffff;
+            --sidebar-hover: #34495e;
+            --navbar-height: 56px;
+            --footer-height: 60px;
+            --transition-speed: 0.3s;
+            /* Primary colors */
+            --primary-color: #2c3e50;
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --accent: #e74c3c;
+            --light-bg: #f8f9fa;
+            --dark-text: #2c3e50;
+            --light-text: #7f8c8d;
+            /* Status colors */
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --info: #3498db;
+            /* Font sizes */
+            --fs-xs: 0.75rem; /* 12px */
+            --fs-sm: 0.875rem; /* 14px */
+            --fs-base: 1rem; /* 16px */
+            --fs-lg: 1.125rem; /* 18px */
+            --fs-xl: 1.25rem; /* 20px */
+            /* Gradients */
+            --primary-gradient: linear-gradient(135deg, #0077b6 0%, #00b4d8 100%);
+            --primary-gradient-light: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+        }
+
+        /* ===== BASE STYLES ===== */
+        body {
+            font-size: var(--fs-sm);
+            line-height: 1.5;
+        }
+
+        /* Font size utility classes */
+        .fs-6 {
+            font-size: var(--fs-base) !important;
+        }
+
+        .fs-7 {
+            font-size: var(--fs-sm) !important;
+        }
+
+        .fs-8 {
+            font-size: var(--fs-xs) !important;
+        }
+
+        /* ===== CARD STYLES ===== */
+        .card {
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 0.75rem;
+            border: 1px solid #e9ecef;
+        }
+
+        .card-header {
+            padding: 0.5rem 1rem;
+            background: var(--primary-color) !important;
+            border-bottom: none;
+        }
+
+            .card-header h6 {
+                margin-bottom: 0;
+                font-weight: 600;
+            }
+
+        .card-body {
+            padding: 0.75rem;
+        }
+
+        /* ===== FORM CONTROLS ===== */
+        .form-control, .form-select {
+            padding: 0.375rem 0.75rem;
+            font-size: var(--fs-sm);
+            border-radius: 5px;
+            border: 1px solid #ced4da;
+            transition: all 0.2s ease;
+        }
+
+            .form-control:focus, .form-select:focus {
+                border-color: #0d6efd;
+                box-shadow: 0 0 0 0.1rem rgba(13, 110, 253, 0.25);
+                outline: none;
+            }
+
+        .form-label {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            font-size: var(--fs-sm);
+        }
+
+        .form-floating > label {
+            font-size: var(--fs-sm);
+        }
+
+        /* ===== BUTTONS ===== */
+        .btn {
+            padding: 0.375rem 0.75rem;
+            font-size: var(--fs-sm);
+            border-radius: 5px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .btn-primary {
+            background: #0d6efd;
+            border-color: #0d6efd;
+        }
+
+            .btn-primary:hover {
+                background: #0b5ed7;
+                border-color: #0a58ca;
+            }
+
+        .btn-outline-primary {
+            border: 1px solid #0d6efd;
+            color: #0d6efd;
+        }
+
+            .btn-outline-primary:hover {
+                background: #0d6efd;
+                color: white;
+            }
+
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: var(--fs-xs);
+        }
+
+        /* ===== FILE UPLOAD STYLES ===== */
+        .file-upload-card {
+            padding: 0.75rem;
+            border: 1px dashed #dee2e6;
+            border-radius: 6px;
+            background: white;
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+
+            .file-upload-card:hover {
+                border-color: #0d6efd;
+                background-color: rgba(13, 110, 253, 0.02);
+            }
+
+        .file-upload-wrapper {
+            position: relative;
+            margin-bottom: 0.5rem;
+            min-height: 80px;
+            cursor: pointer;
+        }
+
+        .file-upload-input {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 10;
+        }
+
+        .file-upload-mask {
+            position: relative;
+            padding: 0.5rem;
+            border: 2px dashed #dee2e6;
+            border-radius: 5px;
+            background: #f8f9fa;
+            text-align: center;
+            transition: all 0.3s ease;
+            z-index: 1;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .file-upload-wrapper:hover .file-upload-mask {
+            border-color: #86b7fe;
+            background-color: rgba(13, 110, 253, 0.05);
+        }
+
+        .file-upload-wrapper.is-valid .file-upload-mask {
+            border-color: var(--success);
+            background-color: rgba(25, 135, 84, 0.05);
+        }
+
+        .file-upload-wrapper.is-invalid .file-upload-mask {
+            border-color: var(--danger);
+            background-color: rgba(220, 53, 69, 0.05);
+        }
+
+        .upload-icon {
+            margin-bottom: 0.25rem;
+            color: #6c757d;
+        }
+
+        .file-upload-text {
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+            color: #495057;
+        }
+
+        /* Icon wrapper for cards */
+        .icon-wrapper {
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            flex-shrink: 0;
+        }
+
+            .icon-wrapper.bg-primary {
+                background: rgba(13, 110, 253, 0.1);
+            }
+
+            .icon-wrapper.bg-danger {
+                background: rgba(220, 53, 69, 0.1);
+            }
+
+            .icon-wrapper.bg-info {
+                background: rgba(23, 162, 184, 0.1);
+            }
+
+        /* File name display */
+        .file-name {
+            display: block;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 100%;
+            font-weight: 500;
+        }
+
+        /* ===== INPUT GROUPS ===== */
+        .input-group {
+            border-radius: 5px;
+        }
+
+        .input-group-text {
+            padding: 0.375rem 0.5rem;
+            font-size: var(--fs-sm);
+            background: #f8f9fa;
+            border: 1px solid #ced4da;
+        }
+
+        .input-group .form-control {
+            border-right: none;
+        }
+
+        #generateSopBtn {
+            height: auto;
+            padding: 0.375rem 1rem;
+            border-radius: 0 5px 5px 0;
+        }
+
+        /* ===== CHECKBOX CARDS (Areas) ===== */
+        .card-checkbox {
+            margin: 0;
+        }
+
+            .card-checkbox .form-check-input {
+                display: none;
+            }
+
+            .card-checkbox .form-check-label {
+                display: block;
+                padding: 0.5rem;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                font-size: var(--fs-xs);
+                cursor: pointer;
+                transition: all 0.2s ease;
+                background: white;
+                margin: 0;
+                height: 100%;
+            }
+
+            .card-checkbox .form-check-input:checked + .form-check-label {
+                background: rgba(13, 110, 253, 0.1);
+                border-color: #0d6efd;
+                color: #0d6efd;
+            }
+
+        .checkbox-icon {
+            width: 20px;
+            height: 20px;
+            min-width: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 50%;
+            background: #e9ecef;
+            color: #6c757d;
+            font-size: var(--fs-xs);
+            transition: all 0.2s ease;
+        }
+
+        .card-checkbox .form-check-input:checked + .form-check-label .checkbox-icon {
+            background: #0d6efd;
+            color: white;
+        }
+
+        /* ===== FREQUENCY SELECTOR ===== */
+        .frequency-selector {
+            padding: 0.5rem;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            background: #f8f9fa;
+        }
+
+            .frequency-selector .btn-outline-primary {
+                padding: 0.25rem 0.5rem;
+                font-size: var(--fs-xs);
+                border-radius: 4px;
+                border: 1px solid #dee2e6;
+                background: white;
+                margin: 0.125rem;
+            }
+
+            .frequency-selector .btn-check:checked + .btn-outline-primary {
+                background: #0d6efd;
+                border-color: #0d6efd;
+                color: white;
+            }
+
+        /* ===== BADGES ===== */
+        .badge {
+            padding: 0.2em 0.5em;
+            font-size: 0.7em;
+            font-weight: 500;
+            border-radius: 10px;
+        }
+
+        /* ===== GRID & SPACING ===== */
+        .row.g-3 > * {
+            padding: 0.375rem;
+        }
+
+        /* Text truncation */
+        .text-truncate {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        /* Form validation */
+        .was-validated .form-control:invalid,
+        .was-validated .form-select:invalid {
+            border-color: var(--danger);
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath stroke-linejoin='round' d='M5.8 3.6h.4L6 6.5z'/%3e%3ccircle cx='6' cy='8.2' r='.6' fill='%23dc3545' stroke='none'/%3e%3c/svg%3e");
+        }
+
+        .was-validated .form-control:valid,
+        .was-validated .form-select:valid {
+            border-color: var(--success);
+            background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 8'%3e%3cpath fill='%23198754' d='M2.3 6.73L.6 4.53c-.4-1.04.46-1.4 1.1-.8l1.1 1.4 3.4-3.8c.6-.63 1.6-.27 1.2.7l-4 4.6c-.43.5-.8.4-1.1.1z'/%3e%3c/svg%3e");
+        }
+
+        .invalid-feedback {
+            font-size: var(--fs-xs);
+        }
+
+        /* ===== RESPONSIVE DESIGN ===== */
+
+        
+        @@media (max-width: 576px) {
+            body
+
+        {
+            font-size: var(--fs-xs);
+        }
+
+        .card-header {
+            padding: 0.375rem 0.75rem;
+        }
+
+            .card-header h6 {
+                font-size: var(--fs-sm);
+            }
+
+        .card-body {
+            padding: 0.5rem;
+        }
+
+        .form-label {
+            font-size: var(--fs-xs);
+            margin-bottom: 0.125rem;
+        }
+
+        .form-control, .form-select, .btn {
+            padding: 0.25rem 0.5rem;
+            font-size: var(--fs-xs);
+        }
+
+        .file-upload-wrapper {
+            min-height: 60px;
+        }
+
+        .file-upload-mask {
+            padding: 0.25rem;
+        }
+
+        .upload-icon .fa-2x {
+            font-size: 1.25em;
+        }
+
+        .file-upload-text {
+            font-size: var(--fs-xs);
+        }
+
+        textarea {
+            min-height: 60px;
+        }
+
+        /* Single column layout */
+        .col-lg-6 {
+            margin-bottom: 0.5rem;
+        }
+
+        /* Area checkboxes - 2 columns */
+        .col-6 {
+            padding: 0.125rem;
+        }
+
+        .card-checkbox .form-check-label {
+            padding: 0.25rem;
+            font-size: var(--fs-xs);
+        }
+
+        .checkbox-icon {
+            width: 16px;
+            height: 16px;
+            font-size: 0.6rem;
+        }
+
+        }
+
+        /* Tablets (768px - 991px) */
+        @@media (min-width: 768px) and (max-width: 991px) {
+            .card-body
+
+        {
+            padding: 1rem;
+        }
+
+        .file-upload-card {
+            padding: 1rem;
+        }
+
+        /* Area checkboxes - 3 columns */
+        .col-sm-4 {
+            padding: 0.25rem;
+        }
+
+        }
+
+        /* Desktop (992px and above) */
+        @@media (min-width: 992px) {
+            .col-lg-6
+
+        {
+            padding: 0.5rem;
+        }
+
+        /* Area checkboxes - 6 columns */
+        .col-lg-2 {
+            padding: 0.25rem;
+        }
+
+        }
+
+        /* Fix for iOS Safari zoom on input focus */
+        @@media (max-width: 768px) {
+            input, select, textarea
+
+        {
+            font-size: 16px;
+        }
+
+        }
+
+        /* Ensure date inputs are usable on mobile */
+        input[type="date"] {
+            min-height: 38px;
+        }
+
+        /* Loading spinner animation */
+        @@keyframes spin {
+            0%
+
+        {
+            transform: rotate(0deg);
+        }
+
+        100% {
+            transform: rotate(360deg);
+        }
+
+        }
+
+        .fa-spinner.fa-spin {
+            animation: spin 1s linear infinite;
+        }
+
+        /* Toast notifications */
+        .toast {
+            opacity: 1;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Highlight effect for drag & drop */
+        .highlight {
+            background-color: rgba(13, 110, 253, 0.1) !important;
+            border-color: #0d6efd !important;
+        }
+
+        /* Submit button container */
+        .d-grid .btn {
+            padding: 0.5rem;
+            font-size: var(--fs-base);
+            font-weight: 600;
+        }
+    </style>
+}

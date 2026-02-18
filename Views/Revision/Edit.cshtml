@@ -1,0 +1,505 @@
+﻿@using SOPMSApp.Controllers
+@model SOPMSApp.ViewModels.DocRegisterRevisionViewModel
+@inject IWebHostEnvironment HostingEnvironment
+@inject ILogger<RevisionController> _logger
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+
+@{
+    ViewData["Title"] = "Revise SOP";
+
+    bool isPost = Context.Request.Method != "GET";
+
+    // Always use OriginalFile as the source of truth if FileName is missing
+    var sourceFile = string.IsNullOrEmpty(Model.FileName) || Model.FileName.ToLower() == "n/a"
+        ? Model.OriginalFile
+        : Model.FileName;
+
+    var (fileUrl, lastModifiedTicks) = GetFileUrlWithTimestamp(sourceFile, Model.DocType);
+
+    var fileExt = System.IO.Path.GetExtension(sourceFile).ToLower();
+    var cacheBuster = DateTime.Now.Ticks;
+}
+
+@if (User.Identity.IsAuthenticated)
+{
+    <div class="container-fluid px-4 py-3">
+        <div class="row g-4">
+            <!-- Main Form Column -->
+            <div class="col-lg-8">
+                <div class="card shadow-sm h-100 border-0">
+                    <div class="card-header bg-primary text-white py-3">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-file-contract fa-lg me-3"></i>
+                            <div>
+                                <h2 class="h5 mb-0">@ViewData["Title"]</h2>
+                                <p class="small mb-0 opacity-75">Update and manage standard operating procedures</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card-body p-4 overflow-auto" style="max-height: calc(100vh - 200px);">
+                        <!-- Alerts -->
+                        @{
+                            var success = TempData["Success"] as string;
+                            var error = TempData["Error"] as string;
+                        }
+
+                        @if (!string.IsNullOrEmpty(success))
+                        {
+                            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                                @success
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        }
+
+                        @if (!string.IsNullOrEmpty(error))
+                        {
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                @error
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        }
+
+                        <form asp-action="Edit" enctype="multipart/form-data" class="needs-validation" novalidate>
+                            <input type="hidden" asp-for="Id" />
+                            <input type="hidden" asp-for="Author" />
+                            <input type="hidden" asp-for="uniqueNumber" />
+
+                            <!-- Document Information -->
+                            <div class="mb-4">
+                                <h5 class="d-flex align-items-center text-primary mb-3">
+                                    <i class="fas fa-info-circle me-2"></i> Document Information
+                                </h5>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <input asp-for="SopNumber" class="form-control shadow-sm" readonly />
+                                            <label asp-for="SopNumber">SOP Number</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <input asp-for="OriginalFile" class="form-control shadow-sm" readonly />
+                                            <label asp-for="OriginalFile">Original File</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <input asp-for="Department" class="form-control shadow-sm" readonly />
+                                            <label asp-for="Department">Department</label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <input asp-for="Revision" class="form-control shadow-sm" readonly />
+                                            <label asp-for="Revision">Next Revision</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Revision Details -->
+                            <div class="mb-4">
+                                <h5 class="d-flex align-items-center text-primary mb-3">
+                                    <i class="fas fa-edit me-2"></i> Revision Details
+                                </h5>
+
+                                <!-- Effective Period -->
+                                <div class="mb-4">
+                                    <label class="form-label fw-semibold">
+                                        <i class="fas fa-calendar-alt me-2 text-primary"></i> Effective Period <span class="text-danger">*</span>
+                                    </label>
+                                    <p class="small text-muted mb-3">Select how many years this revision should remain effective</p>
+
+                                    <div class="d-flex flex-wrap gap-2 mb-2">
+                                        @for (int i = 1; i <= 7; i++)
+                                        {
+                                            <div class="form-check form-check-inline">
+                                                <input class="form-check-input" type="radio" name="yearOption" id="yearOption@(i)" value="@i" onchange="setEffectiveDate()" required />
+                                                <label class="form-check-label btn btn-outline-primary rounded-pill px-3 py-1" for="yearOption@(i)">
+                                                    @i Year@(i > 1 ? "s" : "")
+                                                </label>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="invalid-feedback d-block">
+                                        Please select an effective period.
+                                    </div>
+                                    <div class="form-floating mt-3">
+                                        <input type="text" id="EffectiveDateDisplay" class="form-control" readonly placeholder=" " />
+                                        <label for="EffectiveDateDisplay">Effective Until</label>
+                                    </div>
+                                    <input type="hidden" asp-for="EffectiveDate" id="EffectiveDate" />
+                                </div>
+                                <div class="mb-4 border-top "></div>
+                                
+                                <div class="row g-3">
+                                    <!-- Revision Description -->
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <textarea asp-for="DocumentType" class="form-control shadow-sm" placeholder="Enter revision description..." rows="3" required></textarea>
+                                            <label class="form-label fw-semibold">
+                                                <i class="fas fa-align-left me-2 text-primary"></i>Document Description
+                                                <span class="text-danger">*</span>
+                                            </label>
+                                            <div class="form-text small text-muted mb-2">Briefly describe this Document</div>
+                                            <div class="invalid-feedback">Please provide a description.</div>
+                                            <span asp-validation-for="DocumentType" class="text-danger"></span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Change Description -->
+                                    <div class="col-md-6">
+                                        <div class="form-floating">
+                                            <textarea class="form-control shadow-sm" id="ChangeDescription" name="ChangeDescription"
+                                                  rows="3" placeholder="E.g., Updated step 3 instructions, corrected typos..."
+                                                  required>@Model.ChangeDescription</textarea>
+                                            <label class="form-label fw-semibold">
+                                                <i class="fas fa-edit me-2 text-primary"></i>Change Description
+                                                <span class="text-danger">*</span>
+                                            </label>
+                                            <div class="form-text small text-muted mb-2">Describe what was changed in detail</div>
+                                            <span asp-validation-for="ChangeDescription" class="text-danger"></span>
+                                            <div class="invalid-feedback">Please provide a change description.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-4 border-top "></div>
+                                <!-- File Uploads -->
+                                <div class="mb-4">
+                                    <h5 class="d-flex align-items-center text-primary mb-3">
+                                        <i class="fas fa-cloud-upload-alt me-2"></i> File Uploads
+                                    </h5>
+
+                                    <!-- Revised Original File -->
+                                    <div class="mb-4">
+                                        <label class="form-label fw-semibold">
+                                            <i class="fas fa-file-word me-2 text-primary"></i> Revised Original File <span class="text-danger">*</span>
+                                        </label>
+                                        <p class="small text-muted mb-2">Upload the updated document (must match current filename: @Model.OriginalFile)</p>
+                                        <div class="file-upload-wrapper">
+                                            <input type="file" id="RevisedOriginalFile" name="RevisedOriginalFile" class="form-control shadow-sm" required accept=".doc,.docx,.xls,.xlsx,.pdf" />
+                                            <div class="invalid-feedback">Please select the revised original file.</div>
+                                            <div class="form-text small mt-1">Current file: @Model.OriginalFile</div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Revised PDF File -->
+                                    <div class="mb-3">
+                                        <label class="form-label fw-semibold">
+                                            <i class="fas fa-file-pdf me-2 text-danger"></i> Revised PDF File
+                                        </label>
+                                        <p class="small text-muted mb-2">
+                                            Optional: Upload a PDF version of the document
+                                        </p>
+                                        <div class="file-upload-wrapper">
+                                            <input type="file" name="RevisedPdfFile" class="form-control shadow-sm" accept=".pdf" />
+                                            <div class="form-text small mt-1">
+                                                Current PDF: @(string.IsNullOrEmpty(Model.FileName) || Model.FileName.ToLower() == "n/a" ? "None" : Model.FileName)
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Form Actions -->
+                            <div class="d-flex justify-content-between align-items-center border-top pt-4 mt-3">
+                                <a asp-action="Index" class="btn btn-outline-secondary shadow-sm">
+                                    <i class="fas fa-arrow-left me-2"></i> Cancel
+                                </a>
+                                <button type="submit" class="btn btn-primary shadow-sm px-4">
+                                    <i class="fas fa-save me-2"></i> Save Revision
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Document Preview Sidebar -->
+            <div class="col-lg-4">
+                <div class="card shadow-lg border-0 mb-4">
+                    <div class="card-header bg-primary text-white py-3 d-flex justify-content-between align-items-center">
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-eye me-2"></i>
+                            <span class="fw-semibold">Document Preview</span>
+                        </div>
+                        <div class="btn-group">
+                            @if (!string.IsNullOrEmpty(Model.PdfUrl))
+                            {
+                                <!-- 🔍 Open PDF in Full Screen -->
+                                <a href="@Model.PdfUrl"
+                                   class="btn btn-sm btn-light text-primary border-0 me-1"
+                                   title="Open in full screen">
+                                    <i class="fas fa-expand me-1"></i> Full Screen
+                                </a>
+                            }
+
+                            @if (!string.IsNullOrEmpty(Model.OriginalFile))
+                            {
+                                <a asp-controller="FileAccess"
+                                   asp-action="DownloadFile"
+                                   asp-route-fileName="@System.IO.Path.GetFileName(Model.OriginalFile)"
+                                   asp-route-docType="@Model.DocType"
+                                   class="btn btn-sm btn-light text-primary border-0"
+                                   title="Download Original Document">
+                                    <i class="fas fa-download me-1"></i> Download
+                                </a>
+                            }
+                        </div>
+                    </div>
+
+                    <!-- Preview Content -->
+                    <div class="card-body p-0" style="height: 600px; overflow: hidden; background: #f8f9fa;">
+                        @if (!string.IsNullOrEmpty(Model.VideoUrl))
+                        {
+                            <div class="h-100 d-flex flex-column">
+                                <div class="p-3 bg-dark text-white small d-flex justify-content-between align-items-center">
+                                    <span><i class="fas fa-video me-2"></i>Video Preview</span>
+                                    <span class="badge bg-primary">MP4</span>
+                                </div>
+                                <video controls class="flex-grow-1" style="object-fit: contain; background: #000;">
+                                    <source src="@Model.VideoUrl" type="video/mp4" />
+                                    Your browser does not support the video tag.
+                                </video>
+                            </div>
+                        }
+                        else if (!string.IsNullOrEmpty(Model.PdfUrl))
+                        {
+                            <div class="h-100 d-flex flex-column">
+                                <div class="p-3 bg-light border-bottom small d-flex justify-content-between align-items-center">
+                                    <span><i class="fas fa-file-pdf me-2 text-danger"></i>PDF Preview</span>
+                                    <span class="badge bg-danger">PDF</span>
+                                </div>
+                                <iframe src="@Model.PdfUrl" width="100%" height="500%"   style="border: none;" title="PDF Document Preview">
+                                </iframe>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="d-flex flex-column justify-content-center align-items-center h-100 text-muted p-4">
+                                <i class="fas fa-file-alt fa-4x mb-3 opacity-50"></i>
+                                <h5 class="fw-semibold mb-2">No Preview Available</h5>
+                                <p class="text-center small mb-0">This document type cannot be previewed in the browser.</p>
+                                <p class="text-center small">Use the download button to view the file.</p>
+                            </div>
+                        }
+                    </div>
+
+                    <!-- Document Info Footer -->
+                    <div class="card-footer bg-light py-3">
+                        <div class="row g-2 small">
+                            @if (!string.IsNullOrEmpty(Model.OriginalFile))
+                            {
+                                <div class="col-12">
+                                    <div class="d-flex align-items-center text-truncate">
+                                        <i class="fas fa-file me-2 text-muted"></i>
+                                        <span class="text-truncate" title="@Model.OriginalFile">
+                                            <strong>File:</strong> @Model.OriginalFile
+                                        </span>
+                                    </div>
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(Model.DocType))
+                            {
+                                <div class="col-12">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-tag me-2 text-muted"></i>
+                                        <span><strong>Type:</strong> @Model.DocType</span>
+                                    </div>
+                                </div>
+                            }
+                            @if (!string.IsNullOrEmpty(Model.SopNumber))
+                            {
+                                <div class="col-12">
+                                    <div class="d-flex align-items-center">
+                                        <i class="fas fa-hashtag me-2 text-muted"></i>
+                                        <span><strong>SOP #:</strong> @Model.SopNumber</span>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-info text-center py-5 shadow-sm rounded-4">
+        <i class="fas fa-user-shield fa-3x mb-3 text-primary"></i>
+        <h4 class="fw-bold text-dark">Authentication Required</h4>
+        <p class="text-secondary mb-4">
+            You must be an <strong>Administrator</strong>, <strong>Manager</strong>, or <strong>Technician</strong> to access this page.
+        </p>
+        <a href="/Account/Login" class="btn btn-outline-primary px-4">
+            <i class="fas fa-sign-in-alt me-2"></i> Go to Login
+        </a>
+    </div>
+}
+@section Scripts {
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+
+    <script>
+        // Form validation with button state management
+        (function () {
+            'use strict'
+            var forms = document.querySelectorAll('.needs-validation')
+            Array.prototype.slice.call(forms)
+                .forEach(function (form) {
+                    // Store original button state for each form
+                    const submitBtn = form.querySelector('button[type="submit"]');
+                    const originalBtnHTML = submitBtn ? submitBtn.innerHTML : '';
+
+                    form.addEventListener('submit', function (event) {
+                        const fileInput = document.getElementById('RevisedOriginalFile');
+                        if (fileInput && fileInput.files.length && fileInput.files[0].name !== '@Model.OriginalFile') {
+                            alert('Filename must match: @Model.OriginalFile');
+                            fileInput.value = '';
+                            event.preventDefault();
+                            event.stopPropagation();
+                            return;
+                        }
+
+                        if (!form.checkValidity()) {
+                            event.preventDefault()
+                            event.stopPropagation()
+                            form.classList.add('was-validated')
+                            return;
+                        }
+
+                        // Form is valid, show processing state
+                        event.preventDefault(); // Prevent immediate submission to show processing state
+
+                        // Change button to processing state
+                        if (submitBtn) {
+                            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Processing...';
+                            submitBtn.disabled = true;
+                        }
+
+                        // Validate file before submitting
+                        if (fileInput) {
+                            const isValidFile = !fileInput.files.length || fileInput.files[0].name === '@Model.OriginalFile';
+                            if (!isValidFile) {
+                                // Restore button if file validation fails
+                                if (submitBtn) {
+                                    submitBtn.innerHTML = originalBtnHTML;
+                                    submitBtn.disabled = false;
+                                }
+                                alert('Filename must match: @Model.OriginalFile');
+                                fileInput.value = '';
+                                fileInput.focus();
+                                return;
+                            }
+                        }
+
+                        // Small delay to ensure processing state is visible, then submit
+                        setTimeout(() => {
+                            // Remove the event listener temporarily to prevent recursion
+                            form.removeEventListener('submit', arguments.callee);
+
+                            // Submit the form
+                            form.submit();
+
+                            // If we get here, form submission didn't cause page reload (AJAX scenario)
+                            // In that case, restore button after a reasonable timeout
+                            setTimeout(() => {
+                                if (submitBtn) {
+                                    submitBtn.innerHTML = originalBtnHTML;
+                                    submitBtn.disabled = false;
+                                }
+                                // Re-add the event listener
+                                form.addEventListener('submit', arguments.callee);
+                            }, 5000); // Restore after 5 seconds if no page reload
+                        }, 500); // 500ms delay to show processing state
+
+                        form.classList.add('was-validated')
+                    }, false)
+                })
+        })();
+
+        // Effective date calculation
+        function setEffectiveDate() {
+            const selectedYears = document.querySelector('input[name="yearOption"]:checked')?.value;
+            if (!selectedYears) {
+                document.getElementById("EffectiveDate").value = "";
+                document.getElementById("EffectiveDateDisplay").value = "";
+                return;
+            }
+
+            const today = new Date();
+            today.setFullYear(today.getFullYear() + parseInt(selectedYears));
+
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            const displayDate = today.toLocaleDateString(undefined, options);
+
+            const yyyy = today.getFullYear();
+            const mm = String(today.getMonth() + 1).padStart(2, '0');
+            const dd = String(today.getDate()).padStart(2, '0');
+            document.getElementById("EffectiveDate").value = `${yyyy}-${mm}-${dd}`;
+            document.getElementById("EffectiveDateDisplay").value = displayDate;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const effectiveDate = '@Model.EffectiveDate?.ToString("yyyy-MM-dd")';
+            if (effectiveDate) {
+                const date = new Date(effectiveDate);
+                const today = new Date();
+                const diffYears = date.getFullYear() - today.getFullYear();
+                if (diffYears > 0 && diffYears <= 7) {
+                    document.getElementById(`yearOption${diffYears}`).checked = true;
+                    setEffectiveDate();
+                }
+            }
+
+            // Add event listeners to year options
+            const yearRadios = document.querySelectorAll('input[name="yearOption"]');
+            yearRadios.forEach(radio => {
+                radio.addEventListener('change', setEffectiveDate);
+            });
+
+            // Set initial effective date if no selection yet
+            if (!document.querySelector('input[name="yearOption"]:checked')) {
+                setEffectiveDate();
+            }
+        });
+    </script>
+}
+
+@functions {
+    private (string Url, long LastModifiedTicks) GetFileUrlWithTimestamp(string fileName, string docType = null)
+    {
+        if (string.IsNullOrWhiteSpace(fileName))
+        {
+            _logger.LogWarning("Empty filename provided");
+            return (null, DateTime.Now.Ticks);
+        }
+
+        try
+        {
+            var safeFileName = System.IO.Path.GetFileName(fileName);
+            var fileExt = System.IO.Path.GetExtension(safeFileName).ToLower();
+            string fileUrl = null;
+
+            if (fileExt == ".pdf")
+                fileUrl = Url.Action("GetPdf", "FileAccess", new { fileName = safeFileName, docType });
+            else if (new[] { ".mp4", ".webm", ".ogg", ".avi", ".mov" }.Contains(fileExt))
+                fileUrl = Url.Action("Videos", "FileAccess", new { fileName = safeFileName });
+            else if (new[] { ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx" }.Contains(fileExt))
+                fileUrl = Url.Action("Originals", "FileAccess", new { docType, fileName = safeFileName });
+
+            if (!string.IsNullOrEmpty(fileUrl))
+                return ($"{fileUrl}&v={DateTime.Now.Ticks}", DateTime.Now.Ticks);
+
+            _logger.LogWarning("Could not generate file URL for: {FileName}", fileName);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating file URL for {FileName}", fileName);
+        }
+
+        return (null, DateTime.Now.Ticks);
+    }
+}

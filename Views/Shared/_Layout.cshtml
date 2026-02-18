@@ -1,0 +1,998 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - SOPMSWebApp</title>
+    
+    <!-- Favicon and CSS -->
+    <link rel="icon" type="image/x-icon" href="~/favicon.ico" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/lib/datatables/css/jquery.dataTables.min.css" />
+    <link rel="stylesheet" href="~/lib/buttons/css/buttons.dataTables.min.css" />
+    <link rel="stylesheet" href="~/lib/fontawesome/css/all.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/SOPMSApplication.styles.css" asp-append-version="true" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    @RenderSection("Styles", required: false)
+
+<style>
+    :root {
+         --sidebar-width: 250px;
+        --sidebar-bg: #2c3e50;
+        --sidebar-text: #ffffff;
+        --sidebar-hover: #34495e;
+        --navbar-height: 56px;
+        --footer-height: 60px;
+        --transition-speed: 0.3s;
+        --primary-gradient: linear-gradient(135deg, #0077b6 0%, #00b4d8 100%);
+        --secondary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --accent-gradient:  linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        --primary-color: #2c3e50;
+        --primary: #2c3e50;
+        --secondary: #3498db;
+        --light-bg: #f8f9fa;
+        --dark-text: #2c3e50;
+        --light-text: #7f8c8d;
+        --success: #27ae60;
+        --warning: #f39c12;
+        --danger: #e74c3c;
+        --info: #3498db;
+        --glass-bg: rgba(255, 255, 255, 0.1);
+        --glass-border: rgba(255, 255, 255, 0.2);
+        --shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        --shadow-lg: 0 15px 50px rgba(0, 0, 0, 0.15);
+    }
+
+    /* Modern Scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(135deg, #0077b6, #00b4d8);
+        border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(135deg, #0056b3, #0088cc);
+    }
+
+    /* Base Styles */
+    html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        font-size: 0.95rem;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        overflow-x: hidden;
+    }
+
+    /* Enhanced Navbar */
+    .navbar {
+        position: fixed;
+        top: 0;
+        width: 100%;
+        z-index: 1030;
+        height: var(--navbar-height);
+        background: linear-gradient(135deg, var(--primary-color) 0%, #2c3e50 100%) !important;
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(10px);
+        border-bottom: 1px solid var(--glass-border);
+    }
+
+    .navbar-brand {
+        font-weight: 700;
+        font-size: 1.5rem;
+        background: linear-gradient(45deg, #fff, #e3f2fd);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .navbar-brand img {
+        border-radius: 10px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        transition: transform 0.3s ease;
+    }
+
+    .navbar-brand:hover img {
+        transform: scale(1.05);
+    }
+
+    /* Enhanced Login Button */
+    .btn-login {
+        font-family: 'Segoe UI', sans-serif;
+        font-weight: 600;
+        background: var(--accent-gradient);
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 12px 20px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(245, 87, 108, 0.3);
+        margin-right: 10px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .btn-login::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s;
+    }
+
+    .btn-login:hover::before {
+        left: 100%;
+    }
+
+    .btn-login:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 8px 25px rgba(245, 87, 108, 0.4);
+    }
+
+    /* Enhanced Sidebar */
+    .sidebar {
+        position: fixed;
+        top: var(--navbar-height);
+        left: 0;
+        width: var(--sidebar-width);
+        height: calc(100vh - var(--navbar-height));
+        background: linear-gradient(180deg, var(--sidebar-bg) 0%, #2c3e50 100%);
+        color: white;
+        transform: translateX(-100%);
+        transition: transform var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+        z-index: 1000;
+        overflow-y: auto;
+        box-shadow: var(--shadow-lg);
+        border-right: 1px solid var(--glass-border);
+    }
+
+    .sidebar.active {
+        transform: translateX(0);
+    }
+
+    .sidebar-content {
+        height: calc(100% - 40px);
+        overflow-y: auto;
+        padding: 25px 20px;
+    }
+
+    .sidebar-section {
+        margin-bottom: 2rem;
+        border-radius: 15px;
+        overflow: hidden;
+        background: var(--glass-bg);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--glass-border);
+        transition: all 0.3s ease;
+    }
+
+    .sidebar-section:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .sidebar-title {
+        padding: 15px 20px;
+        margin: 0;
+        font-size: 1rem;
+        font-weight: 600;
+        background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05));
+        border-bottom: 1px solid var(--glass-border);
+    }
+
+    .sidebar-menu {
+        list-style: none;
+        padding: 10px 0;
+        margin: 0;
+    }
+
+    .sidebar-menu li {
+        margin-bottom: 5px;
+    }
+
+    .sidebar-menu a {
+        display: flex;
+        align-items: center;
+        padding: 12px 20px;
+        color: var(--sidebar-text);
+        text-decoration: none;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .sidebar-menu a::before {
+        content: '';
+        position: absolute;
+        left: -100%;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+        transition: left 0.5s;
+    }
+
+    .sidebar-menu a:hover::before {
+        left: 100%;
+    }
+
+    .sidebar-menu a:hover {
+        background: var(--sidebar-hover);
+        transform: translateX(8px);
+        border-left: 3px solid #00b4d8;
+    }
+
+    .sidebar-menu i {
+        margin-right: 12px;
+        width: 20px;
+        text-align: center;
+        font-size: 1.1rem;
+    }
+
+    /* Enhanced Main Content */
+    .main-wrapper {
+        display: flex;
+        min-height: calc(100vh - var(--navbar-height) - var(--footer-height));
+        margin-top: var(--navbar-height);
+    }
+
+    .main-content {
+        flex: 1;
+        padding: 30px;
+        transition: all var(--transition-speed) cubic-bezier(0.4, 0, 0.2, 1);
+        width: 100%;
+        background: transparent;
+    }
+
+    .main-content.sidebar-active {
+        margin-left: var(--sidebar-width);
+        width: calc(100% - var(--sidebar-width));
+    }
+
+    /* Enhanced Sidebar Toggle */
+    .sidebar-toggle {
+        position: fixed;
+        left: 20px;
+        top: 85px;
+        z-index: 1040;
+        background: var(--accent-gradient);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 45px;
+        height: 45px;
+        font-size: 1.3rem;
+        cursor: pointer;
+        box-shadow: var(--shadow);
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .sidebar-toggle:hover {
+        transform: scale(1.1);
+        box-shadow: 0 8px 25px rgba(245, 87, 108, 0.4);
+    }
+
+    /* Enhanced Footer */
+    .footer {
+        position: fixed;
+        left: 0;
+        bottom: 0;
+        width: 100%;
+        height: var(--footer-height);
+        background: linear-gradient(135deg, var(--primary-color) 0%, #2c3e50 100%);
+        color: white;
+        text-align: center;
+        padding: 18px 0;
+        z-index: 1020;
+        transition: all var(--transition-speed) ease;
+        backdrop-filter: blur(10px);
+        border-top: 1px solid var(--glass-border);
+    }
+
+    .footer.sidebar-active {
+        margin-left: var(--sidebar-width);
+        width: calc(100% - var(--sidebar-width));
+    }
+
+    /* Enhanced Date Time Display */
+    .date-time {
+        font-size: 1rem;
+        font-weight: 600;
+        color: white;
+        background: var(--glass-bg);
+        padding: 8px 16px;
+        border-radius: 25px;
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--glass-border);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Enhanced Modal */
+    .modal.fade .modal-dialog {
+        transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        transform: translateY(-50px) scale(0.95);
+    }
+
+    .modal.show .modal-dialog {
+        transform: none;
+    }
+
+    .modal-content {
+        border-radius: 20px;
+        border: none;
+        box-shadow: var(--shadow-lg);
+        backdrop-filter: blur(10px);
+        background: rgba(255, 255, 255, 0.95);
+    }
+
+    .modal-warning .modal-header {
+        background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+        color: #856404;
+        border-bottom: 1px solid #ffeeba;
+        border-radius: 20px 20px 0 0;
+    }
+
+    /* Enhanced Badges */
+    .badge-notification {
+        animation: pulse 2s infinite;
+        font-size: 0.75rem;
+        padding: 4px 8px;
+    }
+
+    @@keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+    }
+
+    /* Enhanced User Info */
+    .user-info {
+        background: var(--glass-bg);
+        padding: 8px 15px;
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--glass-border);
+        color: white;
+    }
+
+    /* Enhanced Cards */
+    .card {
+        margin-bottom: 2rem;
+        border: none;
+        border-radius: 15px;
+        box-shadow: var(--shadow);
+        transition: all 0.3s ease;
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+    }
+
+    .card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-lg);
+    }
+
+    .card-header {
+        background: linear-gradient(135deg, var(--primary-color), #2c3e50);
+        color: white;
+        border-radius: 15px 15px 0 0 !important;
+        padding: 1.25rem 1.5rem;
+        font-weight: 600;
+    }
+
+    /* Responsive Design */
+    @@media (max-width: 992px) {
+        .main-content {
+            margin-left: 0 !important;
+            width: 100% !important;
+            padding: 20px;
+        }
+        
+        .footer {
+            margin-left: 0 !important;
+            width: 100% !important;
+        }
+
+        .sidebar-toggle {
+            top: 80px;
+            left: 15px;
+        }
+    }
+
+    @@media (max-width: 768px) {
+        .navbar-brand {
+            font-size: 1.2rem;
+        }
+
+        .date-time {
+            font-size: 0.85rem;
+            padding: 6px 12px;
+        }
+
+        .main-content {
+            padding: 15px;
+        }
+
+        .sidebar {
+            width: 100%;
+        }
+
+        .main-content.sidebar-active {
+            margin-left: 0;
+            width: 100%;
+        }
+    }
+
+    /* Print Styles */
+    @@media print {
+        .navbar, .sidebar, .footer, .sidebar-toggle {
+            display: none !important;
+        }
+        
+        .main-content {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 100% !important;
+        }
+    }
+
+    /* Loading Animation */
+    .spinner-border {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        vertical-align: text-bottom;
+        border: .25em solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: spinner-border 0.75s linear infinite;
+    }
+
+    @@keyframes spinner-border {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Enhanced Buttons */
+    .btn {
+        border-radius: 10px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        padding: 10px 20px;
+    }
+
+    .btn-outline-light {
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        color: white;
+        background: transparent;
+    }
+
+    .btn-outline-light:hover {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.5);
+        transform: translateY(-2px);
+    }
+
+    /* Table Enhancements */
+    table {
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: var(--shadow);
+    }
+        .table thead th {
+        color: white !important;
+    }
+
+
+    table th {
+        background: linear-gradient(135deg, var(--primary-color), #2c3e50);
+        color: white;
+        font-weight: 600;
+        border: none;
+        padding: 15px;
+    }
+
+    table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    /* Custom Utilities */
+    .glass-effect {
+        background: var(--glass-bg);
+        backdrop-filter: blur(10px);
+        border: 1px solid var(--glass-border);
+    }
+
+    .text-gradient {
+        background: linear-gradient(45deg, #0077b6, #00b4d8);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    /* Hover Animations */
+    .hover-lift {
+        transition: transform 0.3s ease;
+    }
+
+    .hover-lift:hover {
+        transform: translateY(-3px);
+    }
+</style>
+
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-dark">
+            <div class="container-fluid px-4">
+                <!-- Brand + Logo -->
+                <a class="navbar-brand d-flex align-items-center" href="#">
+                    <img src="~/logo1.png" alt="Logo" width="45" height="45" class="me-3">
+                    SOPMS <span class="badge text-secondary ms-2">V 2.10.2</span>
+                </a>
+
+                <!-- Mobile Toggle -->
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                    aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+
+                <!-- Navbar Content -->
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    
+                    <!-- Centered Time Display -->
+                    <div class="navbar-nav mx-auto">
+                        <div class="nav-item d-flex align-items-center h-120">
+                            <span class="date-time" id="currentDateTime"></span>
+                        </div>
+                    </div>
+
+                   @if (User.Identity.IsAuthenticated)
+                    {
+                        <ul class="navbar-nav ms-auto align-items-center">
+                            <li class="nav-item me-3">
+                                <div class="user-info ">
+                                    <i class="fas fa-user-circle text-info me-2"></i>
+                                    @User.FindFirst("LaborName")
+                                </div>
+                            </li>
+                            <li class="nav-item">
+                                <form asp-controller="Account" asp-action="Logout" method="post" id="logoutForm" class="d-inline">
+                                    <button type="submit" class="btn btn-outline-light">
+                                        <i class="fas fa-sign-out-alt me-2"></i> Logout
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    }
+                    else
+                    {
+                        <ul class="navbar-nav ms-auto align-items-center">
+                            <li class="nav-item">
+                                <a asp-controller="Account" asp-action="Login" class="btn btn-login">
+                                    <i class="fas fa-sign-in-alt me-2"></i> LOGIN
+                                </a>
+                            </li>
+                        </ul>
+                    }
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Sidebar Toggle Button -->
+<button type="button" class="sidebar-toggle" id="sidebarToggle">
+    <i class="fas fa-bars"></i>
+</button>
+
+    <div class="main-wrapper">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-content">
+                <div class="sidebar-top-spacer"></div>
+                @if (User.Identity.IsAuthenticated)
+                {
+                    <!-- Dashboard Section -->
+                    <div class="sidebar-section">
+                        <h5 class="sidebar-title">
+                            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                        </h5>
+                        <ul class="sidebar-menu">
+                            <li>
+                                <a asp-controller="Home" asp-action="Index" class="hover-lift">
+                                    <i class="fas fa-home me-2"></i> 
+                                    @(User.IsInRole("Manager") || User.IsInRole("Admin") ? "Return Home" : "Home")
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    @if (User.IsInRole("Manager") || User.IsInRole("Admin") || User.IsInRole("Technician"))
+                    {
+                        <!-- Area & Department Views Section -->
+                       <div class="sidebar-section">
+                            <h5 class="sidebar-title">
+                                <i class="fas fa-map-marked-alt me-2"></i> Area & Department Views
+                            </h5>
+                            <ul class="sidebar-menu">
+                                <li class="sidebar-menu-item">
+                                    <a asp-controller="SopArea" asp-action="Index" class="d-flex justify-content-between align-items-center hover-lift">
+                                        <span><i class="fas fa-map-marked-alt me-2"></i> Area View</span>
+                                        <i class="fas fa-chevron-right small"></i>
+                                    </a>
+                                </li>
+                                <li class="sidebar-menu-item">
+                                    <a asp-controller="SopDept" asp-action="Index" class="d-flex justify-content-between align-items-center hover-lift">
+                                        <span><i class="fas fa-building me-2"></i> Department View</span>
+                                        <i class="fas fa-chevron-right small"></i>
+                                    </a>
+                                </li>
+                            </ul>
+                       </div>
+
+                        if (User.IsInRole("Manager") || User.IsInRole("Admin"))
+                        {
+                            <!-- Document Workflow Section -->
+                            <div class="sidebar-section">
+                                <h5 class="sidebar-title">
+                                    <i class="fas fa-clipboard-check me-2"></i> Document Workflow
+                                </h5>
+                                <ul class="sidebar-menu">
+                                    <li class="sidebar-menu-item">
+                                        <a asp-controller="Approvals" asp-action="Approvals" class="d-flex justify-content-between align-items-center hover-lift">
+                                            <span><i class="fas fa-inbox me-2"></i> Approval Queue</span>
+                                            <span id="pendingBadge" class="badge bg-warning text-dark badge-notification" style="display: none;"></span>
+                                        </a>
+                                    </li>
+
+                                    @if (User.IsInRole("Admin"))
+                                    {
+                                        <li class="sidebar-menu-item">
+                                            <a asp-controller="DeletedFiles" asp-action="Index" class="d-flex justify-content-between align-items-center hover-lift">
+                                                <span><i class="fas fa-trash-restore me-2"></i> Document Archives</span>
+                                                <i class="fas fa-chevron-right small"></i>
+                                            </a>
+                                        </li>
+                                    }
+                                </ul>
+                            </div>
+                        }
+
+                        <!-- Work Instruction Management Section -->
+                          <div class="sidebar-section">
+                                <h5 class="sidebar-title">
+                                    <i class="fas fa-folder-plus me-2"></i> Structured Document Management
+                                </h5>
+                                <ul class="sidebar-menu">
+                                    <li>
+                                        <a asp-controller="StructuredSop" asp-action="Create" class="nav-link d-flex align-items-center hover-lift">
+                                            <i class="fas fa-file-upload me-2 text-info"></i> Create Structured Document
+                                        </a>
+                                    </li>
+                                    <li>
+                                        <a asp-controller="StructuredSop" asp-action="Index" class="d-flex align-items-center hover-lift">
+                                            <i class="fas fa-clock me-2"></i> Review Structured Documents
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+
+                        <!-- Document Management Section -->
+                        <div class="sidebar-section">
+                            <h5 class="sidebar-title">
+                                <i class="fas fa-folder-plus me-2"></i> Document Management
+                            </h5>
+                            <ul class="sidebar-menu">
+                                <li>
+                                    <a asp-controller="FileUpload" asp-action="Index" class="nav-link d-flex align-items-center upload-trigger hover-lift">
+                                        <i class="fas fa-file-upload me-2 text-info"></i> Upload New Document
+                                    </a>
+                                </li>
+                                <li>
+                                    <a asp-controller="FileUpload" asp-action="UploadVideo" class="nav-link d-flex align-items-center hover-lift">
+                                        <i class="fas fa-file-video me-2 text-success"></i> Upload New Video
+                                    </a>
+                                </li>
+                                <li>
+                                    <a asp-controller="Meta" asp-action="Index" class="nav-link d-flex align-items-center hover-lift">
+                                        <i class="fas fa-table me-2"></i> Master Table
+                                    </a>
+                                </li>
+                                @if (User.IsInRole("Admin"))
+                                {
+                                   <li>
+                                        <a asp-controller="FileUpload" asp-action="BulkUpload" class="nav-link d-flex align-items-center upload-trigger hover-lift">
+                                            <i class="fas fa-file-excel me-2 text-success"></i> Batch Upload
+                                        </a>
+                                    </li>
+                                }
+                                <li>
+                                    <a asp-controller="Revision" asp-action="Index" class="d-flex align-items-center hover-lift">
+                                       <i class="fas fa-clock me-2"></i> Document Revision
+                                    </a>
+                                </li>
+                               
+                            </ul>
+                        </div>
+                    }
+                }
+                else
+                {
+                    <div class="sidebar-section">
+                        <h5 class="sidebar-title">
+                            <i class="fas fa-tachometer-alt me-2"></i> Dashboard
+                        </h5>
+                        <ul class="sidebar-menu">
+                            <li>
+                                <a asp-controller="Home" asp-action="Index" class="hover-lift">
+                                    <i class="fas fa-home me-2"></i> Home
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <div class="sidebar-section">
+                        <h5 class="sidebar-title">
+                            <i class="fas fa-map-marked-alt me-2"></i> SOP Areas
+                        </h5>
+                        <ul class="sidebar-menu">
+                            <li>
+                                <a asp-controller="SopArea" asp-action="Index" class="hover-lift">
+                                    <i class="fas fa-shield-alt me-2"></i> Area View
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="sidebar-section">
+                        <h5 class="sidebar-title">
+                            <i class="fas fa-building me-2"></i> Departments
+                        </h5>
+                        <ul class="sidebar-menu">
+                            <li>
+                                <a asp-controller="SopDept" asp-action="Index" class="hover-lift">
+                                    <i class="fas fa-shield-alt me-2"></i> Department View
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+
+                }
+
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main class="main-content" id="mainContent">
+            <!-- Warning Modal -->
+            <div class="modal fade" id="fileWarningModal" tabindex="-1" aria-labelledby="fileWarningModalLabel" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered">
+                    <div class="modal-content border-warning border-3">
+                        <div class="modal-header bg-warning text-dark">
+                            <h5 class="modal-title fw-bold" id="fileWarningModalLabel">
+                                <i class="fas fa-exclamation-triangle me-2"></i> Important Notice
+                            </h5>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="alert alert-info border-0">
+                                <i class="fas fa-info-circle me-2"></i>
+                                <strong>PDF Preview Recommended</strong>
+                            </div>
+                            <p class="mb-3">
+                                For the best viewing experience within the system, please convert your documents to <strong>PDF format</strong> before uploading.
+                            </p>
+                            <ul class="list-unstyled mb-3">
+                                <li><i class="fas fa-check text-success me-2"></i> PDF files can be previewed directly in the system</li>
+                                <li><i class="fas fa-times text-danger me-2"></i> Word/Excel files cannot be previewed inline</li>
+                                <li><i class="fas fa-star text-warning me-2"></i> PDF upload is optional but recommended</li>
+                            </ul>
+                            <div class="text-center text-muted">
+                                <small>Thank you for your cooperation!</small>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-success fw-bold" id="fileWarningProceedBtn">
+                                <i class="fas fa-check-circle me-1"></i> Proceed Anyway
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            @RenderBody()
+        </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer" id="footer">
+        <div class="container text-center">
+            <small class="text-light d-block">
+                &copy; 2025 — <strong class="text-white">SOPMSApp Vision 2.10.2</strong> |
+                <a asp-controller="Home" asp-action="Infor" class="text-decoration-none text-info hover-lift">
+                    <i class="fas fa-info-circle me-1"></i>SOP MS Information
+                </a>
+            </small>
+        </div>
+    </footer>
+
+    <!-- JavaScript Libraries -->
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/lib/datatables/js/jquery.dataTables.min.js"></script>
+    <script src="~/lib/buttons/js/dataTables.buttons.min.js"></script>
+    <script src="~/lib/buttons/js/buttons.html5.min.js"></script>
+    <script src="~/lib/buttons/js/buttons.print.min.js"></script>
+    <script src="~/lib/jszip/jszip.min.js"></script>
+    <script src="~/lib/fontawesome/js/all.min.js"></script>
+
+    <script>
+    // Update date/time display
+    function updateDateTime() {
+        const now = new Date();
+        const options = {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+           
+        };
+        document.getElementById("currentDateTime").textContent = now.toLocaleDateString('en-US', options);
+    }
+
+    // Initialize and update every second
+    updateDateTime();
+    setInterval(updateDateTime, 1000);
+
+    // Main DOMContentLoaded handler
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize the warning modal
+        const fileWarningModal = new bootstrap.Modal(document.getElementById('fileWarningModal'));
+        
+        // Handle all upload trigger links
+        document.querySelectorAll('.upload-trigger').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const targetUrl = this.getAttribute('href');
+                
+                // Set up the proceed button to navigate to the target URL
+                document.getElementById('fileWarningProceedBtn').onclick = function() {
+                    window.location.href = targetUrl;
+                };
+                
+                // Show the warning modal
+                fileWarningModal.show();
+            });
+        });
+
+        // Enhanced Sidebar toggle functionality
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebar = document.getElementById('sidebar');
+        const mainContent = document.getElementById('mainContent');
+        const footer = document.getElementById('footer');
+
+        if (sidebarToggle && sidebar && mainContent && footer) {
+            sidebarToggle.addEventListener('click', function() {
+                sidebar.classList.toggle('active');
+                mainContent.classList.toggle('sidebar-active');
+                footer.classList.toggle('sidebar-active');
+                
+                // Update toggle button icon
+                const icon = this.querySelector('i');
+                if (sidebar.classList.contains('active')) {
+                    icon.className = 'fas fa-times';
+                } else {
+                    icon.className = 'fas fa-bars';
+                }
+                
+                // Store state in localStorage
+                const isActive = sidebar.classList.contains('active');
+                localStorage.setItem('sidebarActive', isActive);
+            });
+
+            // Check localStorage for saved state
+            const savedState = localStorage.getItem('sidebarActive');
+            if (savedState === 'true') {
+                sidebar.classList.add('active');
+                mainContent.classList.add('sidebar-active');
+                footer.classList.add('sidebar-active');
+                sidebarToggle.querySelector('i').className = 'fas fa-times';
+            }
+        }
+
+        // Enhanced window resize handler
+        function handleResize() {
+            if (window.innerWidth > 992) {
+                // Desktop behavior
+                sidebarToggle.style.display = 'block';
+            } else {
+                // Mobile behavior
+                sidebarToggle.style.display = 'block';
+            }
+        }
+
+        // Initial check
+        handleResize();
+        
+        // Add event listener for resize
+        window.addEventListener('resize', handleResize);
+
+        // Enhanced pending approval count
+        
+         async function fetchPendingCount() {
+            try {
+                const response = await fetch('@Url.Action("GetPendingCount", "Home")');
+                const data = await response.json();
+
+                const badge = document.getElementById('pendingBadge');
+                if (data.pending > 0) {
+                    badge.textContent = data.pending;
+                    badge.style.display = 'inline-block';
+                } else {
+                    badge.style.display = 'none';
+                }
+            } catch (err) {
+                console.error("Error fetching pending count", err);
+            }
+        }
+
+        // Fetch every 30 seconds
+        setInterval(fetchPendingCount, 30000);
+
+        // Fetch immediately on page load
+        fetchPendingCount();
+
+        // Add smooth scrolling to all links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // Add loading states to buttons
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', function() {
+                const submitBtn = this.querySelector('button[type="submit"]');
+                if (submitBtn) {
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i> Processing...';
+                    submitBtn.disabled = true;
+                }
+            });
+        });
+    });
+    </script>
+
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,485 @@
+﻿@model IEnumerable<DocRegister>
+@using SOPMSApp.Models
+
+
+@section Styles{
+
+    <style>
+        .table-container {
+            margin-bottom: 100px;
+        }
+    
+        body {
+            padding-bottom: 50px;
+        }
+    
+        /* New styles for enhanced preview options */
+        .preview-options {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+    
+        .preview-btn {
+            min-width: 80px;
+            font-size: 0.875rem;
+        }
+    
+        .video-preview-modal .modal-content {
+            background: #000;
+        }
+    
+        .video-preview-modal .modal-header {
+            border-bottom: 1px solid #333;
+            background: #000;
+            color: white;
+        }
+    
+        .video-preview-modal .btn-close {
+            filter: invert(1);
+        }
+    
+        /* Style for files with multiple preview options */
+        .file-has-multiple {
+            position: relative;
+        }
+    
+        .file-has-multiple::after {
+            content: "📁";
+            margin-left: 5px;
+            font-size: 0.8em;
+        }
+
+        /* Disable right-click and download controls */
+        video {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        /* Hide download controls in video */
+        video::-webkit-media-controls-enclosure {
+            overflow: hidden;
+        }
+
+        video::-webkit-media-controls-panel {
+            width: calc(100% + 30px);
+        }
+
+        /* Prevent video download */
+        video {
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            -khtml-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            pointer-events: none;
+        }
+
+        /* Allow controls to work */
+        video::-webkit-media-controls {
+            pointer-events: auto;
+        }
+
+        /* Hide download button in controls */
+        video::-webkit-media-controls-download-button {
+            display: none;
+        }
+
+        video::-webkit-media-controls-enclosure {
+            overflow: hidden;
+        }
+
+        /* File type icons in table */
+        .table td .fa-file-pdf { color: #dc3545; }
+        .table td .fa-file-video { color: #0d6efd; }
+        .table td .fa-file-image { color: #198754; }
+        .table td .fa-file-word { color: #0dcaf0; }
+        .table td .fa-file { color: #6c757d; }
+        .table td .fa-folder { color: #ffc107; }
+    </style>
+}
+
+<!-- Document Area View -->
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="text-center my-4">Documents Per Area</h1>
+        @if (User.Identity.IsAuthenticated)
+        {
+            @if (User.IsInRole("Manager") || User.IsInRole("Admin"))
+            {
+                <a asp-controller="Home" asp-action="Index" class="btn btn-outline-primary">
+                    <i class="fas fa-tachometer-alt me-2"></i> Return to Home
+                </a>
+            }
+            else
+            {
+                <a asp-controller="Home" asp-action="Index" class="btn btn-outline-primary">
+                    <i class="fas fa-home me-2"></i> Back to Home
+                </a>
+            }
+        }
+        else
+        {
+            <a asp-controller="Home" asp-action="Index" class="btn btn-outline-primary">
+                <i class="fas fa-home me-2"></i> Home
+            </a>
+        }
+    </div>
+</div>
+
+<div class="departments-sidebar">
+    <div class="departments-dropdown text-center mb-4">
+        <i class="fas fa-building"></i> Select Area
+
+        @{
+            var selectedArea = ViewBag.SelectedArea as string;
+            var areaList = ViewBag.areas as List<string> ?? new List<string>();
+        }
+
+        <div class="dropdown mt-2">
+            <button class="btn btn-primary dropdown-toggle" type="button" id="areaDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                @(string.IsNullOrEmpty(selectedArea) ? "Select Area" : selectedArea)
+            </button>
+
+            <ul class="dropdown-menu" aria-labelledby="areaDropdown">
+                @if (User.IsInRole("MANAGER") || User.IsInRole("Admin"))
+                {
+                    <li>
+                        <a class="dropdown-item @(string.IsNullOrEmpty(selectedArea) ? "active" : "")"
+                           asp-controller="SopArea" asp-action="Index">
+                            Clear
+                        </a>
+                    </li>
+                }
+                else
+                {
+                    <li>
+                        <a class="dropdown-item @(string.IsNullOrEmpty(selectedArea) ? "active" : "")"
+                           asp-controller="SopArea" asp-action="Index">
+                            Clear
+                        </a>
+                    </li>
+                }
+
+                @foreach (var areaName in areaList)
+                {
+                    <li>
+                        <a class="dropdown-item @(areaName == selectedArea ? "active" : "")"
+                           asp-controller="SopArea" asp-action="Index" asp-route-area="@areaName">
+                            @areaName
+                        </a>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-warning text-center">No documents found for this department.</div>
+}
+else
+{
+    <div class="mb-3 pd-5 mb-5">
+        <input type="text" id="searchInput" class="form-control" placeholder="Search documents...">
+    </div>
+    <div class="table-container">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th class="sort" data-sort="sopNumber">SOP Number <i class="fas fa-sort"></i></th>
+                    <th class="sort" data-sort="originalFile">Title <i class="fas fa-sort"></i></th>
+                    <th class="sort" data-sort="department">Department <i class="fas fa-sort"></i></th>
+                    <th class="sort" data-sort="area">Area <i class="fas fa-sort"></i></th>
+                    <th class="sort" data-sort="effectiveDate">Effective Date <i class="fas fa-sort"></i></th>
+                    <th class="sort" data-sort="status">Status <i class="fas fa-sort"></i></th>
+                    <th>Preview Options</th>
+                </tr>
+            </thead>
+            <tbody id="docTableBody">
+                @foreach (var doc in Model)
+                {
+                    var ext = (string)System.IO.Path.GetExtension(doc.OriginalFile)?.ToLowerInvariant();
+                    bool isVideo = new List<string> { ".mp4", ".mov", ".avi", ".mkv", ".webm" }.Contains(ext);
+                    bool isPdf = ext == ".pdf";
+                    bool isImage = new List<string> { ".jpg", ".jpeg", ".png", ".gif", ".bmp" }.Contains(ext);
+                    bool isDocument = new List<string> { ".doc", ".docx", ".txt", ".rtf" }.Contains(ext);
+                    
+                    // Check if this document has both video and PDF files
+                    bool hasVideoFile = !string.IsNullOrEmpty(doc.VideoPath);
+                    bool hasPdfFile = isPdf || (!string.IsNullOrEmpty(doc.FileName) && doc.FileName.ToLower().EndsWith(".pdf"));
+                    bool hasMultipleFiles = hasVideoFile && hasPdfFile;
+                    
+                    // Extract just the video filename from the VideoPath
+                    string videoFileName = null;
+                    if (hasVideoFile)
+                    {
+                        videoFileName = System.IO.Path.GetFileName(doc.VideoPath);
+                    }
+                    
+                    // Generate URLs for different file types
+                    var videoUrl = hasVideoFile ? Url.Action("GetVideo", "FileAccess", new { videoPath = videoFileName }) : "#";
+                    var pdfUrl = hasPdfFile ? Url.Action("GetPdf", "FileAccess", new { fileName = doc.FileName }) : "#";
+                    
+                    <tr>
+                        <td class="sopNumber">@doc.SopNumber</td>
+                        <td class="originalFile">
+                            <div class="d-flex align-items-center @(hasMultipleFiles ? "file-has-multiple" : "")">
+                                @if (hasMultipleFiles)
+                                {
+                                    <i class="fas fa-folder text-warning me-2" title="Has multiple file types"></i>
+                                }
+                                else if (isPdf || hasPdfFile)
+                                {
+                                    <i class="fas fa-file-pdf text-danger me-2"></i>
+                                }
+                                else if (isVideo || hasVideoFile)
+                                {
+                                    <i class="fas fa-file-video text-primary me-2"></i>
+                                }
+                                else if (isImage)
+                                {
+                                    <i class="fas fa-file-image text-success me-2"></i>
+                                }
+                                else if (isDocument)
+                                {
+                                    <i class="fas fa-file-word text-info me-2"></i>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-file text-secondary me-2"></i>
+                                }
+                                <span>@doc.OriginalFile</span>
+                                @if (hasMultipleFiles)
+                                {
+                                    <small class="text-muted ms-2">(Multiple formats)</small>
+                                }
+                            </div>
+                        </td>
+                        <td class="department">@doc.Department</td>
+                        <td class="area">@doc.Area</td>
+                        <td class="effectiveDate @(doc.EffectiveDate < DateTime.Today ? "text-danger" : "")"
+                            data-date="@doc.EffectiveDate?.ToString("yyyy-MM-dd")">
+                            @doc.EffectiveDate?.ToString("dd MMM yyyy")
+                        </td>
+                        <td class="status">@doc.Status</td>
+                        <td>
+                            <div class="preview-options">
+                                @if (hasMultipleFiles)
+                                {
+                                    <!-- Show both video and PDF options -->
+                                    <button class="btn btn-sm btn-outline-primary preview-btn play-fullscreen-video" 
+                                            data-video-url="@videoUrl"
+                                            data-file-name="@doc.VideoPath"
+                                            title="Play Video">
+                                        <i class="fas fa-play-circle"></i> Play Video
+                                    </button>
+                                    
+                                    <a asp-controller="SopArea" asp-action="View" asp-route-id="@doc.Id" class="btn btn-sm btn-outline-danger preview-btn" title="View PDF">
+                                        <i class="fas fa-file-pdf"></i> PDF
+                                    </a>
+                                }
+                                else if (isVideo || hasVideoFile)
+                                {
+                                    <!-- Video-only option -->
+                                    <button class="btn btn-sm btn-outline-primary preview-btn play-fullscreen-video" 
+                                            data-video-url="@videoUrl"
+                                            data-file-name="@doc.VideoPath"
+                                            title="Play Video">
+                                        <i class="fas fa-play-circle"></i> Play Video
+                                    </button>
+                                    
+                                    <!-- Debug info (remove in production) -->
+                                    <div class="d-none video-debug-info">
+                                        Video Path: @doc.VideoPath<br>
+                                        Video File: @videoFileName<br>
+                                        Video URL: @videoUrl
+                                    </div>
+                                }
+                                else if (isPdf || hasPdfFile)
+                                {
+                                    <!-- PDF-only option -->
+                                    <a asp-controller="SopArea" asp-action="View" asp-route-id="@doc.Id" class="btn btn-sm btn-outline-danger preview-btn" title="View PDF">
+                                        <i class="fas fa-file-pdf"></i> View PDF
+                                    </a>
+                                }
+                                else
+                                {
+                                    <!-- Generic View Button for other file types -->
+                                    
+                                    <a asp-controller="SopArea" asp-action="View" asp-route-id="@doc.Id" class="btn btn-sm btn-outline-danger preview-btn" title="View PDF">
+                                        <i class="fas fa-file-pdf"></i> View PDF
+                                    </a>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+
+
+<!-- Video Preview Modal for Full Screen -->
+<div class="modal fade video-preview-modal" id="videoPreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="videoPreviewModalLabel">Video Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <video id="modalVideoPlayer" class="w-100" controls controlsList="nodownload" 
+                       oncontextmenu="return false;" style="max-height: 80vh;">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            <div class="modal-footer">
+                <small class="text-muted">Video controls are available but download is disabled</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
+@section scripts{
+
+    <script>
+
+        document.addEventListener("DOMContentLoaded", function () {
+            const tableBody = document.getElementById("docTableBody");
+            let tableRows = Array.from(tableBody.querySelectorAll("tr"));
+            const headers = document.querySelectorAll(".sort");
+
+            // Search functionality
+            const searchInput = document.getElementById("searchInput");
+            if (searchInput) {
+                searchInput.addEventListener("keyup", function () {
+                    const filter = this.value.toLowerCase();
+                    const rows = document.querySelectorAll("#docTableBody tr");
+
+                    rows.forEach(row => {
+                        const text = row.textContent.toLowerCase();
+                        row.style.display = text.includes(filter) ? "" : "none";
+                    });
+                });
+            }
+
+            // Sorting functionality
+            headers.forEach(header => {
+                header.addEventListener("click", function () {
+                    const column = this.dataset.sort;
+                    const ascending = this.dataset.order !== "desc";
+                    this.dataset.order = ascending ? "desc" : "asc";
+
+                    tableRows.sort((a, b) => {
+                        let aVal = a.querySelector(`.${column}`).textContent.trim();
+                        let bVal = b.querySelector(`.${column}`).textContent.trim();
+                    
+                        // Special handling for date sorting
+                        if (column === 'effectiveDate') {
+                            const aDate = a.querySelector('.effectiveDate').getAttribute('data-date');
+                            const bDate = b.querySelector('.effectiveDate').getAttribute('data-date');
+                            return ascending ? (aDate || '').localeCompare(bDate || '') : (bDate || '').localeCompare(aDate || '');
+                        }
+                    
+                        return ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                    });
+
+                    tableRows.forEach(row => tableBody.appendChild(row));
+                    updateSortIcons();
+                });
+            });
+
+            function updateSortIcons() {
+                headers.forEach(header => {
+                    const icon = header.querySelector("i");
+                    icon.classList.remove("fa-sort-up", "fa-sort-down");
+                    icon.classList.add(header.dataset.order === "desc" ? "fa-sort-down" : "fa-sort-up");
+                });
+            }
+
+            // Video Preview Functionality
+            const modalVideoPlayer = document.getElementById('modalVideoPlayer');
+            const videoPreviewModal = new bootstrap.Modal(document.getElementById('videoPreviewModal'));
+
+            // video playback 
+            document.querySelectorAll('.play-fullscreen-video').forEach(button => {
+                button.addEventListener('click', function () {
+                    const videoUrl = this.getAttribute('data-video-url');
+                    const fileName = this.getAttribute('data-file-name');
+
+                    console.log('Video URL:', videoUrl); // Debug log
+                    console.log('File name:', fileName); // Debug log
+
+                    if (!videoUrl || videoUrl === '#') {
+                        console.error('No video URL provided');
+                        alert('Video not available');
+                        return;
+                    }
+
+                    // Update modal title
+                    document.getElementById('videoPreviewModalLabel').textContent = `Video Preview - ${fileName}`;
+
+                    // Set video source directly
+                    modalVideoPlayer.src = videoUrl;
+                
+                    // Show modal first
+                    videoPreviewModal.show();
+
+                    // Try to play when modal is shown and video is ready
+                    const tryPlay = function() {
+                        modalVideoPlayer.play().then(() => {
+                            console.log('Video playing successfully');
+                        }).catch(err => {
+                            console.error('Error playing video:', err);
+                            console.log('Video error details:', err.message);
+                            // Show controls if autoplay fails
+                            modalVideoPlayer.controls = true;
+                        });
+                    };
+
+                    // Wait for modal to be fully shown and video to load
+                    modalVideoPlayer.addEventListener('loadeddata', tryPlay, { once: true });
+                
+                    // Also try after a short delay as fallback
+                    setTimeout(tryPlay, 500);
+                });
+            });
+
+            // Stop video and clean up when modal is closed
+            document.getElementById('videoPreviewModal').addEventListener('hidden.bs.modal', function () {
+                if (modalVideoPlayer) {
+                    modalVideoPlayer.pause();
+                    modalVideoPlayer.currentTime = 0;
+                    modalVideoPlayer.src = '';
+                }
+            });
+
+            // Additional video protection - disable right-click and keyboard shortcuts
+            document.addEventListener('contextmenu', function(e) {
+                if (e.target.tagName === 'VIDEO') {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+
+            // Debug: Log all video URLs on page load
+            console.log('All video URLs on page:');
+            document.querySelectorAll('.play-fullscreen-video').forEach(btn => {
+                console.log('Video URL:', btn.getAttribute('data-video-url'));
+            });
+
+        });
+    </script>
+
+}

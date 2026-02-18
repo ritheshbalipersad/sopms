@@ -1,0 +1,696 @@
+﻿@model List<SOPMSApp.Models.DeletedFileLog>
+@{
+    ViewData["Title"] = "Deleted Documents Archive";
+
+    // Define the function in the view
+    string GetFileIcon(string fileName)
+    {
+        if (string.IsNullOrEmpty(fileName))
+            return "fa-file text-muted";
+
+        var ext = System.IO.Path.GetExtension(fileName)?.ToLowerInvariant()?.TrimStart('.');
+        return ext switch
+        {
+            "pdf" => "fa-file-pdf text-danger",
+            "doc" or "docx" => "fa-file-word text-primary",
+            "xls" or "xlsx" => "fa-file-excel text-success",
+            "ppt" or "pptx" => "fa-file-powerpoint text-warning",
+            "mp4" or "avi" or "mov" or "wmv" => "fa-file-video text-info",
+            "jpg" or "jpeg" or "png" or "gif" or "bmp" => "fa-file-image text-success",
+            "zip" or "rar" or "7z" => "fa-file-archive text-warning",
+            "txt" => "fa-file-text text-muted",
+            _ => "fa-file text-muted"
+        };
+    }
+}
+
+
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (User.Identity.IsAuthenticated && User.IsInRole("Admin"))
+{
+    <div class="deleted-files-container">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h2 class="page-title mb-1">
+                    <i class="fas fa-trash-alt me-2"></i>@ViewData["Title"]
+                </h2>
+                <p class="text-muted mb-0">Manage and restore deleted documents from the archive</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-danger" id="emptyTrashBtn" data-bs-toggle="modal" data-bs-target="#emptyTrashModal">
+                    <i class="fas fa-broom me-1"></i> Empty Trash
+                </button>
+                <a asp-action="Index" asp-controller="Home" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+
+        <!-- Statistics Cards -->
+        <div class="row mb-4">
+            <div class="col-md-3 col-6">
+                <div class="card bg-primary text-white">
+                    <div class="card-body py-3">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-grow-1">
+                                <h4 class="mb-0">@Model.Count</h4>
+                                <small>Total Deleted</small>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-trash fa-2x opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card bg-success text-white">
+                    <div class="card-body py-3">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-grow-1">
+                                <h4 class="mb-0">@Model.Count(d => d.DeletedOn > DateTime.Now.AddDays(-7))</h4>
+                                <small>Last 7 Days</small>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-calendar-week fa-2x opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card bg-warning text-dark">
+                    <div class="card-body py-3">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-grow-1">
+                                <h4 class="mb-0">@Model.Count(d => d.DeletedOn > DateTime.Now.AddMonths(-1))</h4>
+                                <small>Last 30 Days</small>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-calendar-alt fa-2x opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="card bg-info text-white">
+                    <div class="card-body py-3">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-grow-1">
+                                <h4 class="mb-0">@Model.Select(d => d.DeletedBy).Distinct().Count()</h4>
+                                <small>Unique Users</small>
+                            </div>
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-users fa-2x opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search and Filters -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" id="searchInput" placeholder="Search by file name or SOP number...">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="timeFilter">
+                            <option value="">All Time</option>
+                            <option value="7">Last 7 Days</option>
+                            <option value="30">Last 30 Days</option>
+                            <option value="90">Last 90 Days</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="userFilter">
+                            <option value="">All Users</option>
+                            @foreach (var user in Model.Select(d => d.DeletedBy).Distinct().OrderBy(u => u))
+                            {
+                                <option value="@user">@user</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-outline-secondary w-100" id="clearFilters">
+                            <i class="fas fa-times me-1"></i> Clear
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        @if (Model.Count == 0)
+        {
+            <div class="alert alert-info d-flex align-items-center">
+                <i class="fas fa-info-circle me-2 fs-4"></i>
+                <div>
+                    <h5 class="mb-1">No deleted documents found</h5>
+                    <p class="mb-0">Deleted documents will appear here for archival purposes.</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="card">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Deleted Documents</h5>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="selectAll">
+                        <label class="form-check-label small" for="selectAll">Select All</label>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0" id="deletedFilesTable">
+                            <thead class="table-primary">
+                                <tr>
+                                    <th width="40">
+                                        <input type="checkbox" class="form-check-input" id="mainSelectAll">
+                                    </th>
+                                    <th>SOP Number</th>
+                                    <th>File Name</th>
+                                    <th class="d-none d-lg-table-cell">Deleted By</th>
+                                    <th class="d-none d-md-table-cell">Deleted On</th>
+                                    <th class="d-none d-xl-table-cell">Reason</th>
+                                    <th width="200">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var item in Model.OrderByDescending(d => d.DeletedOn))
+                                {
+                                    <tr data-sop="@item.SOPNumber" data-user="@item.DeletedBy" data-date="@item.DeletedOn.ToString("yyyy-MM-dd")">
+                                        <td>
+                                            <input type="checkbox" class="form-check-input row-select" value="@item.Id">
+                                        </td>
+                                        <td>
+                                            <span class="fw-semibold">@item.SOPNumber</span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas @(GetFileIcon(item.OriginalFileName)) text-muted me-2"></i>
+                                                <div>
+                                                    <div class="fw-medium text-truncate" style="max-width: 250px;" title="@item.OriginalFileName">
+                                                        @item.OriginalFileName
+                                                    </div>
+                                                    @if (!string.IsNullOrEmpty(item.FileName) && item.FileName != item.OriginalFileName)
+                                                    {
+                                                        <small class="text-muted">PDF: @item.FileName</small>
+                                                    }
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="d-none d-lg-table-cell">
+                                            <span class="badge bg-secondary">@item.DeletedBy</span>
+                                        </td>
+                                        <td class="d-none d-md-table-cell">
+                                            <div>@item.DeletedOn.ToString("yyyy-MM-dd")</div>
+                                            <small class="text-muted">@item.DeletedOn.ToString("HH:mm")</small>
+                                        </td>
+                                        <td class="d-none d-xl-table-cell">
+                                            <span class="text-truncate d-inline-block" style="max-width: 200px;" title="@item.Reason">
+                                                @item.Reason
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <div class="d-flex gap-1 flex-wrap">
+                                                <a asp-action="Details" asp-controller="DeletedFiles" asp-route-id="@item.Id"
+                                                   class="btn btn-sm btn-outline-info"
+                                                   title="View Details">
+                                                    <i class="fas fa-eye"></i>
+                                                    <span class="d-none d-sm-inline"></span>
+                                                </a>
+                                               
+                                                <button type="button" class="btn btn-sm btn-outline-danger delete-permanent-btn"
+                                                        data-id="@item.Id"
+                                                        data-filename="@item.OriginalFileName"
+                                                        title="Permanently Delete">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted" id="selectedCount">0 items selected</span>
+                        </div>
+                        <div class="d-flex gap-2">
+                           
+                            <button type="button" class="btn btn-danger" id="bulkDeleteBtn" disabled>
+                                <i class="fas fa-trash me-1"></i> Delete Selected
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    <!-- Empty Trash Modal -->
+    <div class="modal fade" id="emptyTrashModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title text-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>Empty Trash
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>Are you sure you want to permanently delete all @Model.Count items in the trash?</p>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <strong>Warning:</strong> This action cannot be undone. All archived files will be permanently deleted.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <form asp-action="EmptyTrash" method="post" id="emptyTrashForm">
+                        @Html.AntiForgeryToken()
+                        <button type="submit" class="btn btn-danger">
+                            <i class="fas fa-broom me-1"></i> Empty Trash
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="alert alert-warning">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-exclamation-triangle me-3 fs-4"></i>
+            <div>
+                <h5 class="mb-1">Access Denied</h5>
+                <p class="mb-0">You need administrator privileges to access the deleted documents archive.</p>
+            </div>
+        </div>
+    </div>
+}
+
+@section Styles {
+    <style>
+        .deleted-files-container {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 25px;
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.05);
+        }
+
+        .page-title {
+            color: #2c3e50;
+            font-weight: 600;
+        }
+
+        .table {
+            font-size: 0.9rem;
+        }
+
+            .table th {
+                font-weight: 600;
+                text-transform: uppercase;
+                font-size: 0.8rem;
+                letter-spacing: 0.5px;
+                border-bottom: 2px solid #dee2e6;
+            }
+
+        .table-hover tbody tr:hover {
+            background-color: rgba(13, 110, 253, 0.04);
+        }
+
+        .card {
+            border: 1px solid rgba(0, 0, 0, 0.125);
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+
+        /* Responsive table improvements */
+        @@media (max-width: 768px) {
+            .deleted-files-container {
+                padding: 15px;
+            }
+
+            .table-responsive {
+                border: 1px solid #dee2e6;
+                border-radius: 0.375rem;
+            }
+
+            #deletedFilesTable thead {
+                display: none;
+            }
+
+            #deletedFilesTable tr {
+                display: block;
+                margin-bottom: 1rem;
+                border: 1px solid #dee2e6;
+                border-radius: 0.375rem;
+                padding: 0.75rem;
+            }
+
+            #deletedFilesTable td {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.5rem 0.75rem;
+                border: none;
+                border-bottom: 1px solid #f8f9fa;
+            }
+
+                #deletedFilesTable td::before {
+                    content: attr(data-label);
+                    font-weight: 600;
+                    color: #495057;
+                    margin-right: auto;
+                    padding-right: 1rem;
+                    text-align: left;
+                    flex: 0 0 120px;
+                }
+
+                #deletedFilesTable td:last-child {
+                    border-bottom: none;
+                    justify-content: flex-end;
+                }
+
+            .row-select {
+                margin-right: auto;
+            }
+        }
+
+        /* Selection styles */
+        .table-hover tbody tr.selected {
+            background-color: rgba(13, 110, 253, 0.1);
+        }
+
+        /* File type icons */
+        .file-icon {
+            width: 20px;
+            text-align: center;
+        }
+    </style>
+}
+
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // ==================== SELECTION MANAGEMENT ====================
+            const mainSelectAll = document.getElementById('mainSelectAll');
+            const selectAll = document.getElementById('selectAll');
+            const rowSelects = document.querySelectorAll('.row-select');
+            const selectedCount = document.getElementById('selectedCount');
+            const bulkRestoreBtn = document.getElementById('bulkRestoreBtn');
+            const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+
+            function updateSelection() {
+                const selected = document.querySelectorAll('.row-select:checked');
+                const count = selected.length;
+
+                selectedCount.textContent = `${count} item${count !== 1 ? 's' : ''} selected`;
+                if (bulkRestoreBtn) bulkRestoreBtn.disabled = count === 0;
+                if (bulkDeleteBtn) bulkDeleteBtn.disabled = count === 0;
+
+                const allChecked = count === rowSelects.length;
+                const someChecked = count > 0 && !allChecked;
+
+                [mainSelectAll, selectAll].forEach(checkbox => {
+                    if (checkbox) {
+                        checkbox.checked = allChecked;
+                        checkbox.indeterminate = someChecked;
+                    }
+                });
+
+                rowSelects.forEach(checkbox => {
+                    const row = checkbox.closest('tr');
+                    row?.classList.toggle('selected', checkbox.checked);
+                });
+            }
+
+            function setupSelectAll(checkbox, checkboxes) {
+                if (!checkbox) return;
+                checkbox.addEventListener('change', function() {
+                    const isChecked = this.checked;
+                    checkboxes.forEach(cb => cb.checked = isChecked);
+                    updateSelection();
+                });
+            }
+
+            setupSelectAll(mainSelectAll, rowSelects);
+            setupSelectAll(selectAll, rowSelects);
+            rowSelects.forEach(checkbox => {
+                checkbox.addEventListener('change', updateSelection);
+            });
+
+            // ==================== FILTERING ====================
+            const searchInput = document.getElementById('searchInput');
+            const timeFilter = document.getElementById('timeFilter');
+            const userFilter = document.getElementById('userFilter');
+            const clearFilters = document.getElementById('clearFilters');
+
+            function filterTable() {
+                const searchTerm = searchInput?.value.toLowerCase() || '';
+                const timeValue = timeFilter?.value || '';
+                const userValue = userFilter?.value.toLowerCase() || '';
+
+                document.querySelectorAll('#deletedFilesTable tbody tr').forEach(row => {
+                    const sop = row.dataset.sop?.toLowerCase() || '';
+                    const user = row.dataset.user?.toLowerCase() || '';
+                    const dateStr = row.dataset.date;
+
+                    let show = true;
+
+                    if (searchTerm) {
+                        const fileName = row.querySelector('td:nth-child(3)')?.textContent?.toLowerCase() || '';
+                        show = show && (sop.includes(searchTerm) || fileName.includes(searchTerm));
+                    }
+
+                    if (timeValue && dateStr) {
+                        const daysAgo = parseInt(timeValue);
+                        const date = new Date(dateStr);
+                        const cutoffDate = new Date();
+                        cutoffDate.setDate(cutoffDate.getDate() - daysAgo);
+                        show = show && (date >= cutoffDate);
+                    }
+
+                    if (userValue) {
+                        show = show && (user.includes(userValue));
+                    }
+
+                    row.style.display = show ? '' : 'none';
+                });
+            }
+
+            searchInput?.addEventListener('input', filterTable);
+            timeFilter?.addEventListener('change', filterTable);
+            userFilter?.addEventListener('change', filterTable);
+
+            clearFilters?.addEventListener('click', function() {
+                if (searchInput) searchInput.value = '';
+                if (timeFilter) timeFilter.value = '';
+                if (userFilter) userFilter.value = '';
+                filterTable();
+            });
+
+            // ==================== UTILITY FUNCTIONS ====================
+            function showLoading(button, text) {
+                const originalHTML = button.innerHTML;
+                button.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ${text}`;
+                button.disabled = true;
+                button.dataset.originalHTML = originalHTML;
+            }
+
+            function resetButton(button) {
+                if (button.dataset.originalHTML) {
+                    button.innerHTML = button.dataset.originalHTML;
+                    button.disabled = false;
+                }
+            }
+
+            function getAntiForgeryToken() {
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                if (!token) {
+                    throw new Error('Anti-forgery token not found');
+                }
+                return token;
+            }
+
+            // ==================== SINGLE DOCUMENT ACTIONS ====================
+            document.querySelectorAll('.restore-btn').forEach(btn => {
+                btn.addEventListener('click', async function(e) {
+                    e.preventDefault();
+                    const id = parseInt(this.dataset.id);
+                    const filename = this.dataset.filename;
+
+                    if (!confirm(`Are you sure you want to restore "${filename}"?`)) return;
+
+                    try {
+                        showLoading(this, 'Restoring...');
+                        await submitSingleAction('RestoreDocument', id);
+                        window.location.reload();
+                    } catch (error) {
+                        console.error('Restore error:', error);
+                        resetButton(this);
+                        alert('Error restoring document. Please try again.');
+                    }
+                });
+            });
+
+            document.querySelectorAll('.delete-permanent-btn').forEach(btn => {
+                btn.addEventListener('click', async function(e) {
+                    e.preventDefault();
+                    const id = parseInt(this.dataset.id);
+                    const filename = this.dataset.filename;
+
+                    if (!confirm(`Permanently delete "${filename}"? This action cannot be undone!`)) return;
+
+                    try {
+                        showLoading(this, 'Deleting...');
+                        await submitSingleAction('DeletePermanent', id);
+                        window.location.reload();
+                    } catch (error) {
+                        console.error('Delete error:', error);
+                        resetButton(this);
+                        alert('Error deleting document. Please try again.');
+                    }
+                });
+            });
+
+            // ==================== BULK ACTIONS ====================
+            if (bulkRestoreBtn) {
+                bulkRestoreBtn.addEventListener('click', async function() {
+                    const selected = getSelectedIds();
+                    if (selected.length === 0) return;
+
+                    if (!confirm(`Restore ${selected.length} selected items?`)) return;
+
+                    try {
+                        showLoading(this, 'Restoring...');
+                        await submitBulkAction('BulkRestoreDocuments', selected);
+                        window.location.reload();
+                    } catch (error) {
+                        console.error('Bulk restore error:', error);
+                        resetButton(this);
+                        alert('Error restoring documents. Please try again.');
+                    }
+                });
+            }
+
+            if (bulkDeleteBtn) {
+                bulkDeleteBtn.addEventListener('click', async function() {
+                    const selected = getSelectedIds();
+                    if (selected.length === 0) return;
+
+                    if (!confirm(`Permanently delete ${selected.length} selected items? This cannot be undone!`)) return;
+
+                    try {
+                        showLoading(this, 'Deleting...');
+                        await submitBulkAction('BulkDeletePermanent', selected);
+                        window.location.reload();
+                    } catch (error) {
+                        console.error('Bulk delete error:', error);
+                        resetButton(this);
+                        alert('Error deleting documents. Please try again.');
+                    }
+                });
+            }
+
+            // ==================== API FUNCTIONS ====================
+            async function submitSingleAction(action, id) {
+                const formData = new FormData();
+                formData.append('__RequestVerificationToken', getAntiForgeryToken());
+                formData.append('id', id.toString());
+
+                const response = await fetch(`@Url.Action("${action}", "DeletedFiles")`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            }
+
+            async function submitBulkAction(action, ids) {
+                const formData = new FormData();
+                formData.append('__RequestVerificationToken', getAntiForgeryToken());
+
+                ids.forEach(id => {
+                    formData.append('documentIds', id.toString());
+                });
+
+                const response = await fetch(`@Url.Action("${action}", "DeletedFiles")`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+            }
+
+            function getSelectedIds() {
+                return Array.from(document.querySelectorAll('.row-select:checked'))
+                    .map(cb => parseInt(cb.value))
+                    .filter(id => !isNaN(id));
+            }
+
+            // ==================== EMPTY TRASH ====================
+            const emptyTrashForm = document.getElementById('emptyTrashForm');
+            if (emptyTrashForm) {
+                emptyTrashForm.addEventListener('submit', function(e) {
+                    const submitBtn = this.querySelector('button[type="submit"]');
+                    if (submitBtn) {
+                        showLoading(submitBtn, 'Emptying Trash...');
+                    }
+                });
+            }
+
+            // ==================== RESPONSIVE TABLE ====================
+            function setDataLabels() {
+                if (window.innerWidth < 768) {
+                    const labels = ['Select', 'SOP Number', 'File Name', 'Deleted By', 'Deleted On', 'Reason', 'Actions'];
+                    document.querySelectorAll('#deletedFilesTable tbody tr').forEach(row => {
+                        const cells = row.querySelectorAll('td');
+                        cells.forEach((cell, index) => {
+                            if (index < labels.length) {
+                                cell.setAttribute('data-label', labels[index]);
+                            }
+                        });
+                    });
+                }
+            }
+
+            setDataLabels();
+            window.addEventListener('resize', setDataLabels);
+
+            // ==================== INITIALIZATION ====================
+            updateSelection(); // Initialize selection state
+            filterTable();     // Initialize filters
+        });
+    </script>
+}

@@ -1,0 +1,21 @@
+﻿@{
+    ViewData["Title"] = "Missing File Verification Report";
+    var missingFiles = ViewBag.MissingFiles as List<string>;
+}
+
+<h2 class="text-danger"> Missing File Report</h2>
+
+@if (missingFiles == null || !missingFiles.Any())
+{
+    <div class="alert alert-success">✅ All expected files are present in the upload directories.</div>
+}
+else
+{
+    <div class="alert alert-warning fw-bold">⚠️ Some expected files may be missing. Please review:</div>
+    <ul class="list-group">
+        @foreach (var file in missingFiles)
+        {
+            <li class="list-group-item fw-bold">@file</li>
+        }
+    </ul>
+}

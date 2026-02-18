@@ -1,0 +1,58 @@
+# Build
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+[Ll]ogs/
+publish/
+*.user
+*.userosscache
+*.suo
+*.cache
+*.dll
+*.exe
+*.pdb
+*.ilk
+*.meta
+*.nupkg
+*.log
+.vs/
+*.csproj.user
+
+# Publish
+*.Publish.xml
+*.pubxml.user
+
+# NuGet
+packages/
+*.nupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ASP.NET
+*.dbmdl
+*.jfm
+*.pfx
+*.publishsettings
+
+# User-specific
+appsettings.Development.json
+appsettings.*.local.json
+secrets.json
+*.rsuser
+
+# Data Protection
+keys/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keep appsettings.json (template/sample) - ignore only local overrides above

@@ -1,0 +1,1504 @@
+﻿@inject IWebHostEnvironment HostingEnvironment
+
+<div class="container-fluid px-4">
+
+    <!-- Alert Messages -->
+      <div class="alerts-container">
+        @if (TempData["Success"] != null)
+        {
+            <div class="alert alert-success fw-bold alert-dismissible fade show" role="alert">
+                @TempData["Success"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["Warning"] != null)
+        {
+            <div class="alert alert-warning fw-bold alert-dismissible fade show" role="alert">
+                @TempData["Warning"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+        @if (TempData["Error"] != null)
+        {
+            <div class="alert alert-danger fw-bold alert-dismissible fade show" role="alert">
+                @TempData["Error"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+    </div>
+
+    <!-- Page Header -->
+    <div class="page-header d-flex justify-content-between align-items-center mb-4 mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="page-title fw-bold mb-0">
+                <i class="fas fa-check-circle text-primary me-2"></i>
+                Approvals Module
+            </h1>
+        </div>
+
+        @if (User.Identity.IsAuthenticated)
+        {
+            <a asp-controller="Home" asp-action="Index" class="btn btn-outline-primary">
+                <i class="fas fa-@(User.IsInRole("Intern") || User.IsInRole("MANAGER") ? "tachometer-alt" : "home") me-2"></i>
+                @(User.IsInRole("Intern") || User.IsInRole("MANAGER") ? "Dashboard" : "Home")
+            </a>
+        }
+       
+    </div>
+
+    @if (User.Identity.IsAuthenticated && User.IsInRole("Admin") || User.IsInRole("MANAGER") || User.IsInRole("Manager"))
+    {
+            <!-- Pending Document Approvals Section -->
+           <div class="approval-section mb-4">
+           <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white py-3">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2 class="section-title mb-0">
+                        <i class="fas fa-file-signature me-2"></i>Pending Document Approvals
+                    </h2>
+                    <span class="badge bg-white text-primary">@Model.PendingApprovals.Count items</span>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>SOP Number</th>
+                                <th>File Name</th>
+                                <th>Uploaded By</th>
+                                <th>Dept Manager</th>
+                                <th>Version</th>
+                                <th>Last Review</th>
+                                <th>Upload Date</th>
+                                <th>Next Review</th>
+                                <th>Department</th>
+                                <th>Area</th>
+                                <th>Status / Returned Date</th>
+                                <th class="text-center">Views</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @if (Model.PendingApprovals.Count > 0)
+                            {
+                                @foreach (var doc in Model.PendingApprovals)
+                                {
+                                    var fileInfo = GetFileInfo(doc);
+                                    bool isVideo = fileInfo.IsVideo;
+                                    bool isPdf = fileInfo.IsPdf;
+                                
+                                    var selectedFileName = !string.IsNullOrWhiteSpace(doc.FileName) && doc.FileName != "N/A"
+                                        ? doc.FileName
+                                        : doc.OriginalFile;
+
+                                    var pdfUrl = isPdf 
+                                        ? Url.Action("GetPdf", "FileAccess", new { fileName = selectedFileName, docType = doc.DocType }) 
+                                        : "#";
+
+                                    var videoUrl = isVideo ? Url.Action("Videos", "FileAccess", new { fileName = doc.OriginalFile }) : "#";
+                                
+                                    <tr data-video-url="@videoUrl">
+                                        <td>@doc.SopNumber</td>
+                                        <td class="text-truncate" style="max-width: 200px;" title="@doc.OriginalFile">
+                                            @doc.OriginalFile
+                                        </td>
+                                        <td>@doc.Author</td>
+                                        <td>@doc.DepartmentSupervisor</td>
+                                        <td>@doc.Revision</td>
+                                        <td>@doc.LastReviewDate?.ToString("dd MMM yyyy")</td>
+                                        <td>@doc.UploadDate.ToString("yyyy-MM-dd")</td>
+                                        <td>@doc.EffectiveDate?.ToString("dd MMM yyyy")</td>
+                                        <td>@doc.Department</td>
+                                        <td>@doc.Area</td>
+                                        <td>
+                                            @if (!string.IsNullOrEmpty(doc.ReviewStatus) && doc.ReviewStatus == "Returned")
+                                            {
+                                                <span class="badge bg-warning text-dark">
+                                                    Returned (@doc.ReturnedDate?.ToString("dd MMM yyyy"))
+                                                </span>
+                                            }
+                                            else if (doc.Status == "Pending Admin Approval")
+                                            {
+                                                <span class="badge bg-info text-dark">Pending Admin</span>
+                                            }
+                                            else if (doc.Status == "Pending Manager Approval")
+                                            {
+                                                <span class="badge bg-primary text-white">Pending Manager</span>
+                                            }
+                                            else if (doc.Status == "Approved")
+                                            {
+                                                <span class="badge bg-success">Approved</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-secondary">@doc.Status</span>
+                                            }
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                @if (isPdf)
+                                                {
+                                                    <a href="@pdfUrl" class="btn btn-outline-secondary" title="View PDF">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                }
+                                                else if (isVideo)
+                                                {
+                                                    <button type="button" class="btn btn-outline-dark play-inline-video" title="Play Video">
+                                                        <i class="fas fa-play"></i>
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <a href="@Url.Action("Download", "FileUpload", new { id = doc.Id, rev = doc.Revision })" 
+                                                       class="btn btn-outline-primary" title="Download">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                }
+                                                <a asp-action="History" asp-route-docRegisterId="@doc.Id" 
+                                                   class="btn btn-outline-info" title="View History">
+                                                    <i class="fas fa-history"></i>
+                                                </a>
+                                            </div>
+                                        </td>
+                                        <td class="text-center">
+                                            <div class="action-buttons d-flex justify-content-center gap-2">
+                                                @if (doc.Status != "Approved")
+                                                {
+                                                    @if (UserHasRole("Manager", "MANAGER") && 
+                                                         (doc.Status == "Pending Approval" || doc.Status == "Pending Manager Approval" || doc.Status == "Under Review"))
+                                                    {
+                                                        <form asp-controller="Approvals" asp-action="ApproveDocument" method="post" class="d-inline">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="sopNumber" value="@doc.SopNumber" />
+                                                            <button type="submit" class="btn btn-sm btn-success" title="Approve for Admin Review">
+                                                                <i class="fas fa-check"></i>
+                                                            </button>
+                                                        </form>
+                                                    }
+                                                    else if (UserHasRole("Admin", "ADMIN") && 
+                                                            (doc.Status == "Pending Approval" || doc.Status == "Pending Admin Approval" || doc.Status == "Under Review"))
+                                                    {
+                                                        <form asp-controller="Approvals" asp-action="ApproveDocument" method="post" class="d-inline">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="sopNumber" value="@doc.SopNumber" />
+                                                            <button type="submit" class="btn btn-sm btn-success" title="Approve Final">
+                                                                <i class="fas fa-check"></i>
+                                                            </button>
+                                                        </form>
+                                                    }
+                                                
+                                                    <button type="button" class="btn btn-sm btn-danger reject-btn" 
+                                                            data-sop="@doc.SopNumber" 
+                                                            data-doc-name="@doc.OriginalFile"
+                                                            title="Return for Review">
+                                                        <i class="fas fa-undo"></i>
+                                                    </button>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted small">No actions</span>
+                                                }
+                                            </div>
+                                        </td>
+                                    </tr>
+                                }
+                            }
+                            else
+                            {
+                                <tr>
+                                    <td colspan="12" class="text-center py-4 text-muted">
+                                        <i class="fas fa-inbox me-2"></i>No documents pending approval
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+        @functions {
+            private bool UserHasRole(params string[] roles)
+            {
+                return roles.Any(role => User.IsInRole(role));
+            }
+        }
+
+            <!-- Pending Deletions Section -->
+        <!-- Pending Deletions Section -->
+        @if (User.Identity.IsAuthenticated && User.IsInRole("Admin"))
+        {
+            <div class="deletion-section mb-5">
+                <div class="card shadow-lg border-danger">
+                    <div class="card-header bg-danger bg-gradient text-white py-3 border-bottom border-3 border-danger">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <h2 class="section-title mb-0">
+                                <i class="fas fa-trash-alt me-2"></i>Pending Deletion Approvals
+                                <small class="fs-6 text-white-50 ms-2">Requires Admin Approval</small>
+                            </h2>
+                            <div>
+                                <span class="badge bg-white text-danger fs-6 px-3 py-2">
+                                    <i class="fas fa-exclamation-triangle me-1"></i>
+                                    @Model.PendingDeletions.Count Pending
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+                        @if (Model.PendingDeletions.Count > 0)
+                        {
+                            <div class="alert alert-warning border-0 rounded-0 m-0 border-bottom border-warning">
+                                <div class="d-flex align-items-center">
+                                    <i class="fas fa-exclamation-circle fa-lg me-3"></i>
+                                    <div>
+                                        <strong>Warning:</strong> These documents are pending permanent deletion. 
+                                        Once approved, they cannot be recovered.
+                                    </div>
+                                </div>
+                            </div>
+                    
+                            <div class="table-responsive">
+                                <table class="table table-hover table-striped mb-0">
+                                    <thead class="table-danger">
+                                        <tr>
+                                            <th width="12%">SOP Number</th>
+                                            <th width="20%">Document</th>
+                                            <th width="12%">Requested By</th>
+                                            <th width="8%" class="text-center">Version</th>
+                                            <th width="10%" class="text-center">Department</th>
+                                            <th width="18%" class="text-center">Deletion Reason</th>
+                                            <th width="10%" class="text-center">Preview</th>
+                                            <th width="10%" class="text-center">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var doc in Model.PendingDeletions)
+                                        {
+                                            var fileInfo = GetFileInfo(doc);
+                                            bool isVideo = fileInfo.IsVideo;
+                                            bool isPdf = fileInfo.IsPdf;
+                                
+                                            // Get secure file URLs
+                                            var pdfUrl = isPdf 
+                                                ? Url.Action("GetPdf", "FileAccess", new { fileName = doc.OriginalFile, docType = doc.DocType }) 
+                                                : "#";
+                                
+                                            var videoUrl = isVideo 
+                                                ? Url.Action("Videos", "FileAccess", new { fileName = doc.OriginalFile }) 
+                                                : "#";
+                                
+                                            var otherFileUrl = !isPdf && !isVideo 
+                                                ? Url.Action("Originals", "FileAccess", new { docType = doc.DocType, fileName = doc.OriginalFile }) 
+                                                : "#";
+
+                                            <tr class="deletion-row align-middle" data-doc-id="@doc.Id" data-doc-name="@doc.OriginalFile">
+                                                <td class="fw-bold text-danger">@doc.SopNumber</td>
+                                                <td>
+                                                    <div class="d-flex align-items-start">
+                                                        <i class="fas fa-file-alt text-danger me-2 mt-1"></i>
+                                                        <div>
+                                                            <div class="fw-medium text-truncate" style="max-width: 250px;" 
+                                                                 title="@doc.OriginalFile" data-bs-toggle="tooltip">
+                                                                @doc.OriginalFile
+                                                            </div>
+                                                            <small class="text-muted d-block">
+                                                                <i class="far fa-calendar me-1"></i>
+                                                                Uploaded: @doc.UploadDate.ToString("MMM dd, yyyy")
+                                                            </small>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td>
+                                                    <div class="text-truncate" style="max-width: 120px;" 
+                                                         title="@doc.DeletionRequestedBy" data-bs-toggle="tooltip">
+                                                        @doc.DeletionRequestedBy
+                                                    </div>
+                                                    <small class="text-muted d-block">
+                                                        <i class="far fa-clock me-1"></i>
+                                                        @doc.LastReviewDate?.ToString("MMM yyyy")
+                                                    </small>
+                                                </td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-secondary rounded-pill px-3 py-1">
+                                                        v@(doc.Revision)
+                                                    </span>
+                                                </td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 px-3 py-1">
+                                                        @doc.Department
+                                                    </span>
+                                                </td>
+                                                <td class="text-center">
+                                                    <div class="deletion-reason-container">
+                                                        <div class="text-truncate deletion-reason-preview" 
+                                                             style="max-width: 200px;"
+                                                             title="@doc.DeletionReason"
+                                                             data-bs-toggle="tooltip">
+                                                            @if (!string.IsNullOrEmpty(doc.DeletionReason))
+                                                            {
+                                                                if (doc.DeletionReason.Length > 60)
+                                                                {
+                                                                    @doc.DeletionReason.Substring(0, 60)<text>...</text>
+                                                                }
+                                                                else
+                                                                {
+                                                                    @doc.DeletionReason
+                                                                }
+                                                            }
+                                                        </div>
+                                                        @if (!string.IsNullOrEmpty(doc.DeletionReason) && doc.DeletionReason.Length > 60)
+                                                        {
+                                                            <button type="button" 
+                                                                    class="btn btn-sm btn-link text-decoration-none p-0 mt-1 view-reason-btn"
+                                                                    data-bs-toggle="popover"
+                                                                    data-bs-placement="left"
+                                                                    data-bs-content="@doc.DeletionReason"
+                                                                    title="Full Deletion Reason">
+                                                                <small><i class="fas fa-expand-alt me-1"></i>View full reason</small>
+                                                            </button>
+                                                        }
+                                                    </div>
+                                                </td>
+                                                <td class="text-center">
+                                                    <div class="btn-group btn-group-sm" role="group">
+                                                        @if (isPdf)
+                                                        {
+                                                            <button type="button" 
+                                                                    class="btn btn-outline-primary preview-document-btn"
+                                                                    data-pdf-url="@pdfUrl"
+                                                                    title="Preview Document">
+                                                                <i class="fas fa-eye"></i>
+                                                            </button>
+                                                        }
+                                                        else if (isVideo)
+                                                        {
+                                                            <button type="button" 
+                                                                    class="btn btn-outline-primary play-video-btn"
+                                                                    data-video-url="@videoUrl"
+                                                                    title="Preview Video">
+                                                                <i class="fas fa-play"></i>
+                                                            </button>
+                                                        }
+                                                        else
+                                                        {
+                                                            <a href="@otherFileUrl" target="_blank" 
+                                                               class="btn btn-outline-primary"
+                                                               title="Preview File">
+                                                                <i class="fas fa-external-link-alt"></i>
+                                                            </a>
+                                                        }
+                                            
+                                                        <a asp-action="History" asp-route-docRegisterId="@doc.Id" 
+                                                           class="btn btn-outline-secondary"
+                                                           title="View Document History">
+                                                            <i class="fas fa-history"></i>
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                                <td class="text-center">
+                                                    <div class="action-buttons d-flex justify-content-center gap-2">
+                                                        @* Approve Deletion - More prominent danger button *@
+                                                        <form asp-action="ApproveDeletion" method="post" class="approve-deletion-form d-inline">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="id" value="@doc.Id" />
+                                                            <button type="submit" 
+                                                                    class="btn btn-sm btn-danger approve-deletion-btn"
+                                                                    title="Approve Permanent Deletion"
+                                                                    data-doc-name="@doc.OriginalFile">
+                                                                <i class="fas fa-trash-alt me-1"></i> 
+                                                            </button>
+                                                        </form>
+                                            
+                                                        @* Reject Deletion *@
+                                                        <form asp-action="RejectDeletion" method="post" class="reject-deletion-form d-inline">
+                                                            @Html.AntiForgeryToken()
+                                                            <input type="hidden" name="id" value="@doc.Id" />
+                                                            <button type="submit" 
+                                                                    class="btn btn-sm btn-success reject-deletion-btn"
+                                                                    title="Reject Deletion - Keep Document"
+                                                                    data-doc-name="@doc.OriginalFile">
+                                                                <i class="fas fa-times me-1"></i> Keep
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                    
+                           <div class="card-footer bg-light border-top">
+                                <div class="row align-items-center">
+                                    <div class="col-md-4">
+                                        <small class="text-muted">
+                                            <i class="fas fa-info-circle me-1"></i>
+                                            Total: @Model.PendingDeletions.Count document(s) pending deletion
+                                        </small>
+                                    </div>
+                                    <div class="col-md-8 text-end">
+                                        <div class="btn-group">
+                                            <button type="button" class="btn btn-outline-danger btn-sm" id="selectAllDeletions">
+                                                <i class="fas fa-check-square me-1"></i> Select All
+                                            </button>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" id="deselectAllDeletions">
+                                                <i class="fas fa-square me-1"></i> Deselect All
+                                            </button>
+                                            <button type="button" class="btn btn-danger btn-sm ms-2" id="deleteAllSelected" disabled>
+                                                <i class="fas fa-trash-alt me-1"></i> Delete All Selected
+                                                <span class="badge bg-white text-danger ms-1" id="selectedCount">0</span>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="text-center py-5">
+                                <div class="mb-3">
+                                    <i class="fas fa-check-circle fa-3x text-success"></i>
+                                </div>
+                                <h4 class="text-muted mb-2">No Pending Deletions</h4>
+                                <p class="text-muted">All documents are properly maintained.</p>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            @* Confirmation Modal for Deletions *@
+            <div class="modal fade" id="confirmDeletionModal" tabindex="-1">
+                <div class="modal-dialog">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title">
+                                <i class="fas fa-exclamation-triangle me-2"></i>Confirm Permanent Deletion
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p>Are you sure you want to permanently delete:</p>
+                            <p class="fw-bold" id="documentToDeleteName"></p>
+                            <div class="alert alert-danger">
+                                <i class="fas fa-skull-crossbones me-2"></i>
+                                <strong>Warning:</strong> This action cannot be undone. The document will be permanently removed from the system.
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="fas fa-times me-1"></i> Cancel
+                            </button>
+                            <button type="button" class="btn btn-danger" id="confirmDeletionBtn">
+                                <i class="fas fa-trash-alt me-1"></i> Delete Permanently
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            @* Video Modal for Deletions *@
+            <div class="modal fade" id="deletionVideoModal" tabindex="-1">
+                <div class="modal-dialog modal-lg">
+                    <div class="modal-content">
+                        <div class="modal-header bg-danger text-white">
+                            <h5 class="modal-title">
+                                <i class="fas fa-video me-2"></i>Video Preview - Pending Deletion
+                            </h5>
+                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                        </div>
+                        <div class="modal-body text-center">
+                            <video id="deletionVideoPlayer" controls style="max-width: 100%;">
+                                Your browser does not support the video tag.
+                            </video>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+    }
+    else if (User.Identity.IsAuthenticated)
+    {
+        <div class="alert alert-warning">
+            <i class="fas fa-lock me-2"></i>You don't have permission to view approval requests.
+        </div>
+    }
+    else
+    {
+        <div class="alert alert-info">
+            <i class="fas fa-sign-in-alt me-2"></i>Please 
+            <a asp-controller="Account" asp-action="Login">login</a> to access this page.
+        </div>
+    }
+</div>
+
+<!-- Reject / Return Modal -->
+<div class="modal fade" id="rejectModal" tabindex="-1" aria-labelledby="rejectModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="rejectForm" method="post" asp-action="RejectDocument">
+                @Html.AntiForgeryToken()
+                <div class="modal-header">
+                    <h5 class="modal-title" id="rejectModalLabel">Return SOP for Review</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="sopNumber" id="rejectSopNumber" />
+                    <div class="mb-3">
+                        <label for="rejectionReason" class="form-label">Reason for Return / Rejection</label>
+                        <textarea class="form-control" id="rejectionReason" name="reason" rows="4" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Submit Reason</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- PDF Preview Modal -->
+<div class="modal fade" id="pdfPreviewModal" tabindex="-1" aria-labelledby="pdfPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-fullscreen-md-down">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="pdfPreviewModalLabel">
+                    <i class="fas fa-file-pdf me-2 text-warning"></i> Document Preview
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0" style="height: 80vh;">
+                <iframe id="pdfViewerFrame" src="" width="100%" height="100%" frameborder="0"></iframe>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+@section Scripts {
+<script>
+    // Global state management
+    const ApprovalDashboard = {
+        activeVideo: null,
+        initialized: false,
+        
+        init: function() {
+            if (this.initialized) return;
+            
+            this.initPDFPreview();
+            this.initVideoHandlers();
+            this.initFormHandlers();
+            this.initTooltips();
+            this.initDeletionHandlers();
+            this.initGlobalHandlers();
+            
+            this.initialized = true;
+            console.log('Approval dashboard initialized successfully');
+        },
+        
+        initPDFPreview: function() {
+            document.querySelectorAll('.preview-pdf-btn, .preview-document-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const fileUrl = btn.dataset.fileUrl || btn.dataset.pdfUrl;
+                    if (!fileUrl || fileUrl === '#') {
+                        console.error('Invalid PDF URL');
+                        this.showAlert('Error: Cannot preview this file', 'danger');
+                        return;
+                    }
+                    
+                    const modal = new bootstrap.Modal(document.getElementById('pdfPreviewModal'));
+                    const pdfFrame = document.getElementById('pdfViewerFrame');
+                    
+                    if (pdfFrame) {
+                        pdfFrame.src = fileUrl;
+                        modal.show();
+                    } else {
+                        console.error('PDF preview modal not found');
+                        window.open(fileUrl, '_blank');
+                    }
+                });
+            });
+        },
+        
+        initVideoHandlers: function() {
+            document.querySelectorAll('.play-inline-video, .play-video-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    this.handleVideoPlay(e, button);
+                });
+            });
+            
+            const videoModal = document.getElementById('videoModal');
+            const deletionVideoModal = document.getElementById('deletionVideoModal');
+            
+            if (videoModal) {
+                videoModal.addEventListener('hidden.bs.modal', () => {
+                    const videoPlayer = document.getElementById('modalVideoPlayer');
+                    if (videoPlayer) {
+                        videoPlayer.pause();
+                        videoPlayer.currentTime = 0;
+                    }
+                });
+            }
+            
+            if (deletionVideoModal) {
+                deletionVideoModal.addEventListener('hidden.bs.modal', () => {
+                    const videoPlayer = document.getElementById('deletionVideoPlayer');
+                    if (videoPlayer) {
+                        videoPlayer.pause();
+                        videoPlayer.currentTime = 0;
+                    }
+                });
+            }
+        },
+        
+        handleVideoPlay: function(e, button) {
+            e.preventDefault();
+            
+            const videoUrl = button.dataset.videoUrl;
+            const isDeletionTable = button.closest('.deletion-row');
+            
+            if (!videoUrl || videoUrl === '#') {
+                console.error('No video URL found');
+                this.showAlert('Error: Cannot play this video', 'danger');
+                return;
+            }
+            
+            if (isDeletionTable) {
+                const videoPlayer = document.getElementById('deletionVideoPlayer');
+                const modal = new bootstrap.Modal(document.getElementById('deletionVideoModal'));
+                
+                if (videoPlayer) {
+                    videoPlayer.src = videoUrl;
+                    videoPlayer.load();
+                    
+                    videoPlayer.onerror = () => {
+                        console.error('Deletion video playback failed');
+                        this.showAlert('Error playing video in modal', 'warning');
+                        modal.hide();
+                    };
+                    
+                    modal.show();
+                } else {
+                    window.open(videoUrl, '_blank');
+                }
+            } else {
+                this.playVideoInModal(videoUrl);
+            }
+        },
+        
+        playVideoInModal: function(videoUrl) {
+            const modal = new bootstrap.Modal(document.getElementById('videoModal'));
+            const videoPlayer = document.getElementById('modalVideoPlayer');
+            
+            if (!videoPlayer) {
+                console.error('Video modal player not found');
+                window.open(videoUrl, '_blank');
+                return;
+            }
+            
+            videoPlayer.src = videoUrl;
+            videoPlayer.load();
+            
+            videoPlayer.onerror = () => {
+                console.error('Modal video playback failed');
+                this.showAlert('Error playing video in modal', 'warning');
+                modal.hide();
+            };
+            
+            modal.show();
+        },
+        
+        stopAllVideos: function() {
+            const videoPlayers = [
+                document.getElementById('modalVideoPlayer'),
+                document.getElementById('deletionVideoPlayer'),
+                ...document.querySelectorAll('.inline-video')
+            ];
+            
+            videoPlayers.forEach(player => {
+                if (player) {
+                    player.pause();
+                    player.currentTime = 0;
+                }
+            });
+        },
+        
+        initFormHandlers: function() {
+            document.addEventListener('submit', (e) => {
+                const form = e.target;
+                const submitBtn = form.querySelector('button[type="submit"]');
+                
+                if (submitBtn && !submitBtn.classList.contains('no-loading')) {
+                    this.setButtonLoading(submitBtn, true);
+                    
+                    setTimeout(() => {
+                        this.setButtonLoading(submitBtn, false);
+                    }, 30000);
+                }
+            });
+            
+            document.addEventListener('click', (e) => {
+                if (e.target.closest('.reject-btn')) {
+                    this.handleRejectButton(e);
+                }
+            });
+            
+            const rejectForm = document.getElementById('rejectForm');
+            if (rejectForm) {
+                rejectForm.addEventListener('submit', (e) => {
+                    if (!this.validateRejectForm()) {
+                        e.preventDefault();
+                    }
+                });
+            }
+        },
+        
+        handleRejectButton: function(e) {
+            const button = e.target.closest('.reject-btn');
+            const sopNumber = button?.dataset.sop;
+            const docName = button?.dataset.docName;
+            
+            if (!sopNumber) {
+                console.error('No SOP number found');
+                this.showAlert('Error: Cannot find SOP number', 'danger');
+                return;
+            }
+            
+            const sopInput = document.getElementById('rejectSopNumber');
+            const reasonInput = document.getElementById('rejectionReason');
+            
+            if (sopInput && reasonInput) {
+                sopInput.value = sopNumber;
+                reasonInput.value = '';
+                
+                if (docName) {
+                    const modalTitle = document.getElementById('rejectModalLabel');
+                    if (modalTitle) {
+                        modalTitle.textContent = `Return "${docName}" for Review`;
+                    }
+                }
+                
+                const modal = new bootstrap.Modal(document.getElementById('rejectModal'));
+                modal.show();
+                reasonInput.focus();
+            } else {
+                console.error('Reject modal elements not found');
+                this.showAlert('Error: Rejection form not available', 'danger');
+            }
+        },
+        
+        validateRejectForm: function() {
+            const reason = document.getElementById('rejectionReason')?.value?.trim();
+            
+            if (!reason) {
+                this.showAlert('Please provide a reason for rejection.', 'warning');
+                document.getElementById('rejectionReason')?.focus();
+                return false;
+            }
+            
+            if (reason.length < 10) {
+                this.showAlert('Please provide a more detailed reason (minimum 10 characters).', 'warning');
+                document.getElementById('rejectionReason')?.focus();
+                return false;
+            }
+            
+            return true;
+        },
+        
+        initDeletionHandlers: function() {
+            // Handle individual deletion approval
+            document.querySelectorAll('.approve-deletion-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const form = e.target.closest('.approve-deletion-form');
+                    const docName = btn.dataset.docName;
+                    
+                    if (!form || !docName) {
+                        console.error('Missing form or document name');
+                        return;
+                    }
+                    
+                    this.confirmDeletion(form, docName);
+                });
+            });
+            
+            // Initialize bulk deletion handlers
+            this.initDeleteAllHandlers();
+            
+            // Handle popovers for deletion reasons
+            document.querySelectorAll('.view-reason-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                });
+            });
+        },
+        
+        initDeleteAllHandlers: function() {
+            // Select All button
+            document.getElementById('selectAllDeletions')?.addEventListener('click', () => {
+                document.querySelectorAll('.deletion-row').forEach(row => {
+                    row.classList.add('selected');
+                });
+                this.updateDeleteAllButton();
+            });
+            
+            // Deselect All button
+            document.getElementById('deselectAllDeletions')?.addEventListener('click', () => {
+                document.querySelectorAll('.deletion-row').forEach(row => {
+                    row.classList.remove('selected');
+                });
+                this.updateDeleteAllButton();
+            });
+            
+            // Individual row selection toggle
+            document.querySelectorAll('.deletion-row').forEach(row => {
+                row.addEventListener('click', (e) => {
+                    if (!e.target.closest('button, a, input, .btn, .form-control')) {
+                        row.classList.toggle('selected');
+                        this.updateDeleteAllButton();
+                    }
+                });
+            });
+            
+            // Delete All Selected button
+            document.getElementById('deleteAllSelected')?.addEventListener('click', (e) => {
+                e.preventDefault();
+                const selectedRows = document.querySelectorAll('.deletion-row.selected');
+                
+                if (selectedRows.length === 0) {
+                    this.showAlert('No documents selected for deletion.', 'warning');
+                    return;
+                }
+                
+                this.confirmDeleteAll(selectedRows);
+            });
+        },
+        
+        updateDeleteAllButton: function() {
+            const selectedRows = document.querySelectorAll('.deletion-row.selected');
+            const deleteAllBtn = document.getElementById('deleteAllSelected');
+            const selectedCount = document.getElementById('selectedCount');
+            
+            if (deleteAllBtn && selectedCount) {
+                deleteAllBtn.disabled = selectedRows.length === 0;
+                selectedCount.textContent = selectedRows.length;
+            }
+        },
+        
+        confirmDeleteAll: function(selectedRows) {
+            const selectedCount = selectedRows.length;
+            const documentNames = Array.from(selectedRows).map(row => {
+                const cell = row.querySelector('td:nth-child(2)');
+                return cell?.querySelector('.fw-medium')?.textContent || 
+                       cell?.textContent?.trim() || 
+                       'Unknown Document';
+            });
+            
+            // Create confirmation modal HTML if it doesn't exist
+            if (!document.getElementById('deleteAllConfirmationModal')) {
+                const modalHtml = `
+                    <div class="modal fade" id="deleteAllConfirmationModal" tabindex="-1">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header bg-danger text-white">
+                                    <h5 class="modal-title">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>Confirm Bulk Deletion
+                                    </h5>
+                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="alert alert-danger">
+                                        <i class="fas fa-skull-crossbones fa-lg me-2"></i>
+                                        <strong>Warning: This action cannot be undone!</strong>
+                                    </div>
+                                    
+                                    <p>You are about to delete <strong class="text-danger">${selectedCount} document(s)</strong> permanently.</p>
+                                    
+                                    <div class="selected-documents-list mb-3" style="max-height: 200px; overflow-y: auto;">
+                                        <ul class="list-group">
+                                            ${documentNames.map((name, index) => `
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    <span>${index + 1}. ${name}</span>
+                                                    <span class="badge bg-danger rounded-pill">DELETE</span>
+                                                </li>
+                                            `).join('')}
+                                        </ul>
+                                    </div>
+                                    
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="confirmPermanentDelete">
+                                        <label class="form-check-label text-danger fw-bold" for="confirmPermanentDelete">
+                                            I understand this will permanently delete all selected documents
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                        <i class="fas fa-times me-1"></i> Cancel
+                                    </button>
+                                    <button type="button" class="btn btn-danger" id="confirmBulkDeleteBtn" disabled>
+                                        <i class="fas fa-trash-alt me-1"></i> Delete All (${selectedCount})
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+            } else {
+                // Update existing modal content
+                const modalBody = document.querySelector('#deleteAllConfirmationModal .modal-body');
+                const confirmBtn = document.getElementById('confirmBulkDeleteBtn');
+                
+                modalBody.querySelector('p strong').textContent = `${selectedCount} document(s)`;
+                
+                const listContainer = modalBody.querySelector('.selected-documents-list ul');
+                listContainer.innerHTML = documentNames.map((name, index) => `
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        <span>${index + 1}. ${name}</span>
+                        <span class="badge bg-danger rounded-pill">DELETE</span>
+                    </li>
+                `).join('');
+                
+                confirmBtn.innerHTML = `<i class="fas fa-trash-alt me-1"></i> Delete All (${selectedCount})`;
+                confirmBtn.disabled = true;
+            }
+            
+            // Show modal
+            const modal = new bootstrap.Modal(document.getElementById('deleteAllConfirmationModal'));
+            modal.show();
+            
+            // Handle confirmation checkbox
+            const confirmCheckbox = document.getElementById('confirmPermanentDelete');
+            const confirmBulkDeleteBtn = document.getElementById('confirmBulkDeleteBtn');
+            
+            confirmCheckbox.checked = false;
+            confirmCheckbox.addEventListener('change', function() {
+                confirmBulkDeleteBtn.disabled = !this.checked;
+            });
+            
+            // Handle bulk delete confirmation
+            confirmBulkDeleteBtn.addEventListener('click', () => {
+                if (!confirmCheckbox.checked) return;
+                
+                this.executeBulkDelete(selectedRows);
+                modal.hide();
+            });
+        },
+        
+        executeBulkDelete: function(selectedRows) {
+            const selectedIds = Array.from(selectedRows).map(row => {
+                return row.dataset.docId || row.querySelector('input[name="id"]')?.value;
+            }).filter(id => id);
+            
+            if (selectedIds.length === 0) {
+                this.showAlert('No valid document IDs found.', 'danger');
+                return;
+            }
+            
+            const deleteAllBtn = document.getElementById('deleteAllSelected');
+            const originalText = deleteAllBtn.innerHTML;
+            
+            // Show loading state
+            deleteAllBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Deleting...';
+            deleteAllBtn.disabled = true;
+            
+            // Get anti-forgery token
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            
+            // Submit all deletions
+            const promises = selectedIds.map(id => {
+                return fetch('/Approvals/ApproveDeletion', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'RequestVerificationToken': token
+                    },
+                    body: `id=${encodeURIComponent(id)}`
+                });
+            });
+            
+            // Wait for all deletions to complete
+            Promise.all(promises)
+                .then(responses => {
+                    const successful = responses.filter(r => r.ok).length;
+                    const failed = responses.length - successful;
+                    
+                    // Show result summary
+                    if (failed === 0) {
+                        this.showAlert(`Successfully deleted ${successful} document(s).`, 'success');
+                        setTimeout(() => location.reload(), 1500);
+                    } else {
+                        const message = successful > 0 
+                            ? `Partially completed: ${successful} deleted, ${failed} failed.` 
+                            : `Failed to delete any documents.`;
+                        
+                        this.showAlert(message, 'warning');
+                        setTimeout(() => location.reload(), 2000);
+                    }
+                })
+                .catch(error => {
+                    console.error('Bulk delete error:', error);
+                    this.showAlert('An error occurred during bulk deletion.', 'danger');
+                    
+                    // Restore button state
+                    deleteAllBtn.innerHTML = originalText;
+                    deleteAllBtn.disabled = false;
+                });
+        },
+        
+        confirmDeletion: function(form, docName) {
+            const documentToDeleteName = document.getElementById('documentToDeleteName');
+            const confirmBtn = document.getElementById('confirmDeletionBtn');
+            
+            if (!documentToDeleteName || !confirmBtn) {
+                console.error('Confirmation modal elements not found');
+                this.showAlert('Error: Confirmation dialog not available', 'danger');
+                return;
+            }
+            
+            documentToDeleteName.textContent = docName;
+            
+            const modal = new bootstrap.Modal(document.getElementById('confirmDeletionModal'));
+            modal.show();
+            
+            // Remove previous listeners and add new one
+            confirmBtn.replaceWith(confirmBtn.cloneNode(true));
+            const newConfirmBtn = document.getElementById('confirmDeletionBtn');
+            
+            newConfirmBtn.addEventListener('click', () => {
+                this.setButtonLoading(newConfirmBtn, true);
+                form.submit();
+            });
+        },
+        
+        initTooltips: function() {
+            const tooltipTriggerList = [].slice.call(
+                document.querySelectorAll('[data-bs-toggle="tooltip"]')
+            );
+            tooltipTriggerList.forEach(tooltipTriggerEl => {
+                new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+            
+            console.log('Tooltips initialized');
+        },
+        
+        initGlobalHandlers: function() {
+            window.addEventListener('error', (e) => {
+                console.error('Global error:', e.error);
+            });
+            
+            window.addEventListener('beforeunload', () => {
+                this.destroy();
+            });
+            
+            document.addEventListener('hidden.bs.modal', () => {
+                this.stopAllVideos();
+            });
+        },
+        
+        setButtonLoading: function(button, isLoading) {
+            if (isLoading) {
+                const originalHTML = button.innerHTML;
+                button.dataset.originalHtml = originalHTML;
+                button.disabled = true;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Processing...';
+            } else if (button.dataset.originalHtml) {
+                button.disabled = false;
+                button.innerHTML = button.dataset.originalHtml;
+                delete button.dataset.originalHtml;
+            }
+        },
+        
+        showAlert: function(message, type = 'info') {
+            const toastContainer = document.querySelector('.alerts-container') || document.body;
+            const toastId = 'toast-' + Date.now();
+            
+            const toastHtml = `
+                <div id="${toastId}" class="toast align-items-center text-white bg-${type} border-0" role="alert">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                    </div>
+                </div>
+            `;
+            
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = toastHtml.trim();
+            const toastElement = tempDiv.firstChild;
+            
+            toastContainer.appendChild(toastElement);
+            
+            const toast = new bootstrap.Toast(toastElement, {
+                autohide: true,
+                delay: 5000
+            });
+            
+            toast.show();
+            
+            toastElement.addEventListener('hidden.bs.toast', () => {
+                toastElement.remove();
+            });
+        },
+        
+        destroy: function() {
+            this.stopAllVideos();
+            this.activeVideo = null;
+            this.initialized = false;
+            
+            const tooltips = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            tooltips.forEach(el => {
+                const instance = bootstrap.Tooltip.getInstance(el);
+                if (instance) {
+                    instance.dispose();
+                }
+            });
+        }
+    };
+    
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => ApprovalDashboard.init());
+    } else {
+        ApprovalDashboard.init();
+    }
+    
+    // Handle popovers
+    document.addEventListener('DOMContentLoaded', function() {
+        const popoverTriggerList = [].slice.call(
+            document.querySelectorAll('[data-bs-toggle="popover"]')
+        );
+        popoverTriggerList.map(function (popoverTriggerEl) {
+            return new bootstrap.Popover(popoverTriggerEl, {
+                trigger: 'focus',
+                html: true
+            });
+        });
+    });
+
+    // Fallback confirmDelete function
+    function confirmDelete(id, documentName = 'this document') {
+        if (confirm(`Are you sure you want to delete "${documentName}"? This action cannot be undone.`)) {
+            console.log(`User confirmed deletion of document ${id}`);
+            
+            const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+            if (!token) {
+                console.error('Anti-forgery token not found');
+                ApprovalDashboard.showAlert('Security token missing. Please refresh the page.', 'danger');
+                return;
+            }
+            
+            const originalText = event.target.innerHTML;
+            event.target.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Deleting...';
+            event.target.disabled = true;
+            
+            fetch(`/Approvals/Delete/${id}`, {
+                method: 'POST',
+                headers: {
+                    'RequestVerificationToken': token,
+                    'Content-Type': 'application/json'
+                }
+            }).then(response => {
+                if (response.ok) {
+                    ApprovalDashboard.showAlert('Document deleted successfully', 'success');
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            }).catch(error => {
+                console.error('Delete failed:', error);
+                ApprovalDashboard.showAlert('Delete failed. Please try again.', 'danger');
+                event.target.innerHTML = originalText;
+                event.target.disabled = false;
+            });
+        }
+    }
+</script>
+}
+
+@section Styles {
+    <style>
+    /* Base Styles */
+    body {
+        background-color: #f8f9fa;
+    }
+
+    .container-fluid {
+        max-width: 1800px;
+    }
+
+    /* Header Styles */
+    .page-header {
+        padding-bottom: 0.5rem;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .page-title {
+        font-weight: 600;
+        color: #2c3e50;
+    }
+
+    /* Card Styles */
+    .card {
+        border-radius: 0.5rem;
+        overflow: hidden;
+    }
+
+    .card-header {
+        font-weight: 600;
+    }
+
+    .section-title {
+        font-size: 1.25rem;
+        font-weight: 500;
+    }
+
+    /* Table Styles */
+    .table {
+        font-size: 0.9rem;
+    }
+
+        .table thead th {
+        color: white !important;
+    }
+
+        .table th {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            color: #495057;
+            background-color: #f8f9fa !important;
+        }
+
+        .table td {
+            vertical-align: middle;
+        }
+
+    /* Badge Styles */
+    .badge {
+        font-weight: 500;
+        padding: 0.4em 0.75em;
+        border-radius: 0.25rem;
+    }
+
+    /* Button Styles */
+    .btn-sm {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.75rem;
+    }
+
+    .action-buttons .btn {
+        width: 30px;
+        height: 30px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Empty State Styles */
+    .text-muted i {
+        opacity: 0.5;
+    }
+
+    /* Responsive Adjustments */
+    @@media (max-width: 768px) {
+        .page-title {
+            font-size: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+            gap: 0.25rem !important;
+        }
+        
+        .table-responsive {
+            border: none;
+        }
+    }
+
+    .video-preview {
+        padding-top: 0.5rem;
+    }
+
+    /* Deletion table specific styles */
+    .deletion-row:hover {
+        background-color: rgba(220, 53, 69, 0.05) !important;
+    }
+
+    .table-striped tbody tr:nth-of-type(odd) {
+        background-color: rgba(220, 53, 69, 0.02);
+    }
+
+    .deletion-reason-container {
+        position: relative;
+    }
+
+    .deletion-reason-preview {
+        cursor: help;
+    }
+
+    .approve-deletion-btn:hover {
+        background-color: #dc3545 !important;
+        border-color: #dc3545 !important;
+        box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.5);
+    }
+
+    .reject-deletion-btn:hover {
+        background-color: #198754 !important;
+        border-color: #198754 !important;
+        box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.5);
+    }
+
+    .card.border-danger {
+        border-width: 2px !important;
+    }
+
+    /* Tooltip customization for deletion table */
+    .popover {
+        max-width: 400px;
+    }
+
+    .popover-header {
+        background-color: #dc3545;
+        color: white;
+        font-weight: bold;
+    }
+
+    /* Selection styling */
+    .deletion-row.selected {
+        background-color: rgba(255, 193, 7, 0.2) !important;
+        border-left: 4px solid #ffc107;
+    }
+
+        /* Selected row styling */
+    .deletion-row.selected {
+        background-color: rgba(220, 53, 69, 0.1) !important;
+        border-left: 4px solid #dc3545 !important;
+        position: relative;
+    }
+
+    .deletion-row.selected::after {
+        content: '✓';
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #dc3545;
+        font-weight: bold;
+    }
+
+    /* Delete All button states */
+    #deleteAllSelected:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    #deleteAllSelected .badge {
+        font-size: 0.75em;
+        padding: 0.25em 0.5em;
+    }
+
+    /* Modal styling */
+    #deleteAllConfirmationModal .modal-header {
+        background: linear-gradient(135deg, #dc3545, #c82333);
+    }
+
+    .selected-documents-list {
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+    }
+
+    .selected-documents-list .list-group-item {
+        border-left: none;
+        border-right: none;
+        padding: 0.5rem 1rem;
+    }
+
+    .selected-documents-list .list-group-item:first-child {
+        border-top: none;
+    }
+
+    .selected-documents-list .list-group-item:last-child {
+        border-bottom: none;
+    }
+
+
+</style>
+}
+
+@functions {
+    public class FileInfoResult
+    {
+        public string Path { get; set; }             
+        public bool IsPdf { get; set; }
+        public bool IsVideo { get; set; }
+        public string DisplayName { get; set; }
+        public long LastModifiedTicks { get; set; }  
+    }
+
+   private FileInfoResult GetFileInfo(DocRegister doc)
+{
+    // Pick the most reliable filename
+    var fileName = !string.IsNullOrWhiteSpace(doc.FileName) && doc.FileName != "N/A"
+        ? doc.FileName
+        : doc.OriginalFile;
+
+    var result = new FileInfoResult
+    {
+        DisplayName = fileName
+    };
+
+    if (!string.IsNullOrWhiteSpace(fileName))
+    {
+        var extension = System.IO.Path.GetExtension(fileName)?.ToLower();
+        result.IsPdf = extension == ".pdf";
+        result.IsVideo = extension is ".mp4" or ".mov" or ".avi" or ".webm" or ".ogg";
+
+        // Build URL dynamically depending on type
+        if (result.IsPdf)
+        {
+            result.Path = Url.Action("GetPdf", "FileAccess", new
+            {
+                fileName = fileName,
+                docType = doc.DocType
+            });
+        }
+        else if (result.IsVideo)
+        {
+            result.Path = Url.Action("Videos", "FileAccess", new
+            {
+                fileName = fileName
+            });
+        }
+        else
+        {
+            result.Path = Url.Action("Originals", "FileAccess", new
+            {
+                docType = doc.DocType,
+                fileName = fileName
+            });
+        }
+
+        // Cache-busting
+        result.LastModifiedTicks = doc.UploadDate.Ticks;
+    }
+
+    return result;
+}
+
+}

@@ -1,0 +1,1647 @@
+﻿@using System.IO
+@model IEnumerable<SOPMSApp.Models.DocRegisterViewModel>
+@inject IWebHostEnvironment HostingEnvironment
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuration
+
+<!-- Notification Alerts -->
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="fas fa-check-circle me-2"></i>@TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="fas fa-exclamation-circle me-2"></i>@TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+}
+
+   
+
+<!-- Main Section -->
+@if (User.Identity.IsAuthenticated)
+{
+    <div class="sop-table-container">
+        <!-- Header Section -->
+        <div class="table-header bg-light border-bottom py-3 px-4">
+            <div class="d-flex align-items-center flex-wrap gap-3 w-100">
+                <!-- Title & Stats -->
+                <div class="d-flex align-items-center flex-wrap gap-4 flex-grow-1">
+                    <div class="d-flex align-items-center">
+                        <div class="header-icon bg-primary text-white rounded-circle p-3 me-3">
+                            <i class="fas fa-file-alt fa-lg"></i>
+                        </div>
+                        <div>
+                            <h4 class="mb-0 fw-bold text-dark">Files Mastertable</h4>
+                            <p class="text-muted mb-0 small">All documents</p>
+                        </div>
+                    </div>
+
+                    <div class="document-stats">
+                        @{
+                            var totalCount = Model.Count();
+                            var activeCount = Model.Count(vm => vm.Document.ReviewStatus == "Active");
+                            var renewCount = Model.Count(vm => vm.Document.ReviewStatus == "Renew");
+                            var expiredCount = Model.Count(vm => vm.Document.ReviewStatus == "Expired");
+                        }
+                        <span class="badge bg-primary">
+                            <i class="fas fa-files me-1"></i>@totalCount Documents
+                        </span>
+                        <span class="badge bg-success ms-2">
+                            <i class="fas fa-check-circle me-1"></i>@activeCount Active
+                        </span>
+                        <span class="badge bg-warning ms-2">
+                            <i class="fas fa-sync-alt me-1"></i>@renewCount Renew
+                        </span>
+                        <span class="badge bg-danger ms-2">
+                            <i class="fas fa-exclamation-triangle me-1"></i>@expiredCount Expired
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <div class="btn-group" role="group">
+                        @if (Model.Any())
+                        {
+                            <div class="text-end mb-3">
+                                <a href="@Url.Action("ExportMetadataXlsx", "Meta")" class="btn btn-primary">
+                                    <i class="fa fa-file-excel"></i> Export Metadata (Excel)
+                                </a>
+                            </div>
+
+                        }
+                        else
+                        {
+                           <div class="text-end mb-3">
+                                <a href="@Url.Action("ExportMetadataXlsx", "Meta")" class="btn btn-primary">
+                                    <i class="fa fa-file-excel"></i> Export Metadata (Excel)
+                                </a>
+                            </div>
+
+                        }
+                    </div>
+
+                    <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Filter Section -->
+        <div class="filter-section">
+            <div class="filter-header">
+                <h6 class="mb-0"><i class="fas fa-filter me-2"></i>Filters</h6>
+            </div>
+
+            <div class="collapse show" id="filterCollapse">
+                <!-- First Filter Row -->
+                <div class="filter-row row g-3 align-items-end mb-3">
+                    <!-- Department -->
+                    <div class="col-xl-2 col-lg-4 col-md-6">
+                        <label for="departmentFilter" class="form-label small fw-semibold">Department</label>
+                        <select class="form-select" id="departmentFilter">
+                            <option value="">All Departments</option>
+                            @foreach (var dept in Model.Select(vm => vm.Document.Department).Distinct().OrderBy(d => d))
+                            {
+                                <option value="@dept">@dept</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Document Type -->
+                    <div class="col-xl-2 col-lg-4 col-md-6">
+                        <label for="docTypeFilter" class="form-label small fw-semibold">Document Type</label>
+                        <select class="form-select" id="docTypeFilter">
+                            <option value="">All Types</option>
+                            @foreach (var type in Model.Select(vm => vm.Document.DocType).Distinct().OrderBy(d => d))
+                            {
+                                <option value="@type">@type</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Status -->
+                    <div class="col-xl-2 col-lg-4 col-md-6">
+                        <label for="statusFilter" class="form-label small fw-semibold">Status</label>
+                        <select class="form-select" id="statusFilter">
+                            <option value="">All Status</option>
+                            <option value="active">Active</option>
+                            <option value="renew">Near Expiry</option>
+                            <option value="expired">Expired</option>
+                        </select>
+                    </div>
+
+                    <!-- Last Review Date Range -->
+                    <div class="col-xl-3 col-lg-6 col-md-6">
+                        <label class="form-label small fw-semibold">Last Review Date Range</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="fas fa-calendar-alt"></i></span>
+                                <input type="date" class="form-control" id="dateFromFilter">
+                            </div>
+                            <span class="fw-semibold">to</span>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="fas fa-calendar-alt"></i></span>
+                                <input type="date" class="form-control" id="dateToFilter">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Second Filter Row -->
+                <div class="filter-row row g-3 align-items-end">
+                    <!-- Author -->
+                    <div class="col-xl-2 col-lg-4 col-md-6">
+                        <label for="authorFilter" class="form-label small fw-semibold">Uploaded By</label>
+                        <select class="form-select" id="authorFilter">
+                            <option value="">All Authors</option>
+                            @foreach (var author in Model.Select(vm => vm.Document.Author).Distinct().OrderBy(a => a))
+                            {
+                                <option value="@author">@author</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- Supervisor -->
+                    <div class="col-xl-2 col-lg-4 col-md-6">
+                        <label for="supervisorFilter" class="form-label small fw-semibold">Department Manager</label>
+                        <select class="form-select" id="supervisorFilter">
+                            <option value="">All Managers</option>
+                            @foreach (var supervisor in Model.Select(vm => vm.Document.DepartmentSupervisor).Where(s => !string.IsNullOrEmpty(s)).Distinct().OrderBy(s => s))
+                            {
+                                <option value="@supervisor">@supervisor</option>
+                            }
+                        </select>
+                    </div>
+
+                    <!-- File Type -->
+                    <div class="col-xl-2 col-lg-4 col-md-6">
+                        <label for="fileTypeFilter" class="form-label small fw-semibold">File Type</label>
+                        <select class="form-select" id="fileTypeFilter">
+                            <option value="">All File Types</option>
+                            <option value="pdf">PDF Files</option>
+                            <option value="video">Video Files</option>
+                            <option value="other">Other Files</option>
+                        </select>
+                    </div>
+
+                    <!-- Next Review Date Range -->
+                    <div class="col-xl-3 col-lg-6 col-md-6">
+                        <label class="form-label small fw-semibold">Next Review Date Range</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="fas fa-calendar-check"></i></span>
+                                <input type="date" class="form-control" id="effectiveDateFromFilter">
+                            </div>
+                            <span class="fw-semibold">to</span>
+                            <div class="input-group">
+                                <span class="input-group-text bg-light"><i class="fas fa-calendar-check"></i></span>
+                                <input type="date" class="form-control" id="effectiveDateToFilter">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reset Filters -->
+                    <div class="col-xl-3 col-lg-6 col-md-12">
+                        <div class="d-flex gap-2 h-100 align-items-end">
+                            <button id="clearAllFilters" class="btn btn-light border text-secondary fw-semibold shadow-sm d-flex align-items-center gap-2 px-3 py-2">
+                                <i class="fas fa-rotate-left"></i>
+                                <span>Reset Filters</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Table Section -->
+        <div class="table-section">
+           <div class="table-responsive" style="overflow-x:auto; width:100%;">
+                <table id="metadataTable" class="table table-hover table-striped">
+                    <thead class="table-primary">
+                        <tr>
+                            <th data-sort="description" data-priority="1">Description</th>
+                            <th data-sort="sopnumber" data-priority="2">SOP Number</th>
+                            <th data-sort="filename" data-priority="3">File Name</th>
+                            <th data-sort="author">Uploaded By</th>
+                            <th data-sort="department">Department</th>
+                            <th data-sort="doctype">Document Type</th>
+                            <th data-sort="lastreview">Last Review</th>
+                            <th data-sort="uploaddate">Upload Date</th>
+                            <th data-sort="effectivedate">Next Review</th>
+                            <th data-sort="status" data-priority="4">Status</th>
+                            <th data-sort="revision">Revision</th>
+                            <th></th>
+                            <th data-priority="5">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            foreach (var vm in Model)
+                            {
+                                var doc = vm.Document;
+                                var fileInfo = vm.FileInfo;
+                                var statusClass = vm.StatusClass;
+                                var statusIcon = doc.ReviewStatus == "Active" ? "fa-check-circle" :
+                                doc.ReviewStatus == "Renew" ? "fa-sync-alt" : "fa-exclamation-triangle";
+
+                                <tr id="row-@doc.Id"
+                                    data-status="@doc.ReviewStatus?.ToLower()"
+                                    data-file-url="@vm.PdfUrl"
+                                    data-is-pdf="@fileInfo.IsPdf.ToString().ToLower()"
+                                    data-is-video="@fileInfo.IsVideo.ToString().ToLower()"
+                                    data-file-name="@doc.FileName"
+                                    data-original-name="@doc.OriginalFile"
+                                    data-download-url="@vm.DownloadUrl"
+                                    class="document-row">
+                                    <td>
+                                        <div class="document-info">
+                                            <div class="document-title">@doc.DocumentType</div>
+                                            @if (!string.IsNullOrEmpty(doc.Area))
+                                            {
+                                                <small class="text-muted">@doc.Area</small>
+                                            }
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <code class="sop-number">@doc.SopNumber</code>
+                                    </td>
+                                    <td class="filename">
+                                        <div class="file-info">
+                                            <i class="fas @(fileInfo.IsPdf ? "fa-file-pdf text-danger" : fileInfo.IsVideo ? "fa-file-video text-primary" : "fa-file text-secondary") me-2"></i>
+                                            <span class="file-name">@doc.OriginalFile</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="user-info">
+                                            <div>@doc.Author</div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="department-badge">@doc.Department</span>
+                                        @if (!string.IsNullOrEmpty(doc.DepartmentSupervisor))
+                                        {
+                                            <div>
+                                                <small class="text-muted">Manager: @doc.DepartmentSupervisor</small>
+                                            </div>
+                                        }
+                                    </td>
+                                    <td>@doc.DocType</td>
+                                    <td data-order="@(doc.LastReviewDate?.ToString("yyyyMMdd") ?? "")">
+                                        <div>@doc.LastReviewDate?.ToString("dd MMM yyyy")</div>
+                                        <small class="text-muted">@((DateTime.Now - doc.LastReviewDate)?.Days) days ago</small>
+                                    </td>
+                                    <td data-order="@doc.UploadDate.ToString("yyyyMMdd")">
+                                        <div class="date-cell">
+                                            <div>@doc.UploadDate.ToString("dd MMM yyyy")</div>
+                                            <small class="text-muted">@((DateTime.Now - doc.UploadDate).Days) days ago</small>
+                                        </div>
+                                    </td>
+                                    <td data-order="@(doc.EffectiveDate?.ToString("yyyyMMdd") ?? "")">
+                                        @if (doc.EffectiveDate.HasValue)
+                                        {
+                                            var daysUntilReview = (doc.EffectiveDate.Value - DateTime.Now).Days;
+                                            <div class="date-cell">
+                                                <div>@doc.EffectiveDate?.ToString("dd MMM yyyy")</div>
+                                                <small class="@(daysUntilReview <= 30 ? "text-warning" : "text-muted")">
+                                                    @(daysUntilReview > 0 ? $"{daysUntilReview} days" : "Overdue")
+                                                </small>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="text-muted">Not set</span>
+                                        }
+                                    </td>
+                                    <td>
+                                        <span class="badge @statusClass status-badge">
+                                            <i class="fas @statusIcon me-1"></i>@doc.ReviewStatus
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="revision-badge">@doc.Revision</span>
+                                    </td>
+                                    
+                                    <td>
+                                       <button type="button" class="btn btn-sm btn-outline-primary preview-choice-btn action-btn" 
+                                                data-original-file="@doc.OriginalFile"
+                                                data-sop-file-name="@doc.FileName"
+                                                data-video-path="@doc.VideoPath"
+                                                data-doc-type="@doc.DocType" 
+                                                title="Preview Document">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                        <!-- History Button -->
+                                        <a asp-action="History" asp-route-docRegisterId="@doc.Id" class="btn btn-outline-info btn-sm action-btn" title="View History">
+                                            <i class="fas fa-history"></i>
+                                        </a>
+
+                                       
+                                    </td>
+                                   <td>
+                                        <div class="action-buttons d-flex align-items-center gap-2 flex-wrap">
+                                           
+                                            <!-- Delete Button -->
+                                            @if (User.IsInRole("Admin"))
+                                            {
+                                                 <!-- Download Button -->
+                                                <a href="@vm.DownloadUrl" class="btn btn-sm btn-outline-success action-btn" title="Download Document">
+                                                    <i class="fas fa-download"></i>
+                                                </a>
+
+                                                <!-- Delete Form -->
+                                                <form asp-action="Delete" asp-controller="Meta" asp-route-id="@doc.Id" method="post" class="d-inline">
+                                                    @Html.AntiForgeryToken()
+                                                    <button type="submit" class="btn btn-sm btn-outline-danger action-btn"
+                                                            onclick="return confirm('Are you sure you want to permanently delete this document?')" 
+                                                            title="Permanently Delete">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            }
+                                            else if(User.IsInRole("Manager"))
+                                            {
+                                                <!-- Request Deletion Button -->
+                                                <button type="button" class="btn btn-sm btn-outline-warning action-btn"
+                                                        data-bs-toggle="modal" data-bs-target="#deleteModal_@doc.Id"
+                                                        title="Request Deletion">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            }
+                                        </div>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="12" class="text-center py-5">
+                                    <div class="empty-state">
+                                        <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                                        <h5 class="text-muted">No documents found</h5>
+                                        <p class="text-muted">No SOP documents match your current filters.</p>
+                                        <button id="resetView" class="btn btn-primary">Reset View</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Table Footer -->
+        <div class="table-footer">
+            <div class="footer-info">
+                <span id="visibleCount">@Model.Count()</span> of <span id="totalCount">@Model.Count()</span> documents shown
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <!-- Authentication Required -->
+    <div class="auth-required">
+        <div class="text-center py-5">
+            <i class="fas fa-lock fa-4x text-muted mb-4"></i>
+            <h3 class="text-muted">Authentication Required</h3>
+            <p class="text-muted mb-4">Please log in to access the SOP Management System</p>
+            <a asp-controller="Account" asp-action="Login" class="btn btn-primary btn-lg">
+                <i class="fas fa-sign-in-alt me-2"></i>Login to Continue
+            </a>
+        </div>
+    </div>
+}
+
+
+
+
+<!-- Delete Confirmation Modals -->
+@foreach (var vm in Model ?? Enumerable.Empty<SOPMSApp.Models.DocRegisterViewModel>())
+{
+    var doc = vm.Document;
+    <div class="modal fade" id="deleteModal_@doc.Id" tabindex="-1" aria-labelledby="deleteModalLabel_@doc.Id" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 rounded-4 shadow-lg">
+                <div class="modal-header border-0 rounded-top-4" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+                    <h5 class="modal-title text-white fw-semibold" id="deleteModalLabel_@doc.Id">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Confirm Deletion Request
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+
+                <form asp-action="RequestDelete" asp-controller="Meta" asp-route-id="@doc.Id" method="post">
+                    @Html.AntiForgeryToken()
+                    <div class="modal-body py-4 px-4">
+                        <div class="alert alert-warning border-warning mb-4">
+                            <i class="fas fa-info-circle me-2"></i>
+                            You are requesting deletion of this document. An admin will review your request.
+                        </div>
+
+                        <div class="d-flex align-items-center mb-3">
+                            <i class="fas fa-file-alt text-muted me-3" style="font-size: 1.5rem;"></i>
+                            <div>
+                                <h6 class="mb-1 fw-bold">@doc.SopNumber</h6>
+                                <p class="mb-0 text-muted small">@doc.DocumentType</p>
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label for="deletionReason_@doc.Id" class="form-label fw-semibold">Reason for Deletion</label>
+                            <textarea class="form-control" id="deletionReason_@doc.Id" name="DeletionReason"
+                                  rows="3" required placeholder="Please explain why this document should be deleted"></textarea>
+                            <div class="invalid-feedback">Please provide a reason for deletion.</div>
+                        </div>
+
+                        <p class="text-danger fw-semibold mb-0">
+                            <i class="fas fa-exclamation-circle me-2"></i>
+                            This action cannot be undone
+                        </p>
+                    </div>
+
+                    <div class="modal-footer d-flex justify-content-between border-top-0 px-4 pb-4">
+                        <button type="button" class="btn btn-outline-secondary px-4 rounded-3" data-bs-dismiss="modal">
+                            <i class="fas fa-times me-2"></i> Cancel
+                        </button>
+                        <button type="submit" class="btn btn-danger px-4 rounded-3">
+                            <i class="fas fa-trash-alt me-2"></i> Request Deletion
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+}
+
+
+<!-- Choose Preview Modal -->
+<div class="modal fade" id="choosePreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Choose Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center py-4" id="choosePreviewBody">
+                <!-- Dynamic content will be populated here -->
+            </div>
+            <div class="modal-footer d-flex justify-content-between align-items-center px-4 pb-4 border-top-0" id="choosePreviewFooter">
+                <button type="button" class="btn btn-outline-secondary btn-lg px-4 rounded-3" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i> Close
+                </button>
+                @if (User.IsInRole("Admin"))
+                {
+                    <a id="downloadPreview" class="btn btn-primary btn-lg px-4 rounded-3 shadow-sm" href="#" download>
+                        <i class="fas fa-download me-2"></i> Download File
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Video Player Modal -->
+<div class="modal fade" id="videoModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Video Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <video id="modalVideo" class="w-100" controls style="max-height: 70vh;">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Fallback Preview Modal (for unsupported files) -->
+<div class="modal fade" id="docPreviewModal" tabindex="-1" aria-labelledby="docPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content shadow-lg border-0 rounded-4" style="background-color: #f8f9fa;">
+            <div class="modal-header border-0 rounded-top-4" style="background: linear-gradient(135deg, #004085 0%, #002752 100%);">
+                <h5 class="modal-title text-white fw-semibold" id="docPreviewModalLabel">
+                    <i class="fas fa-file-alt me-2 text-warning"></i>
+                    <span id="modalTitle">Preview Not Available</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-5 px-4">
+                <div class="d-flex flex-column align-items-center">
+                    <i class="fas fa-exclamation-circle text-warning mb-4" style="font-size: 4rem;"></i>
+                    <h4 class="mb-3 text-dark fw-bold">Preview Not Available</h4>
+                    <p class="text-muted fs-5 mb-4">This file type cannot be previewed in the browser. Please download the file to view its contents.</p>
+                    <div class="alert alert-warning w-75">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Supported preview formats: PDF or video files only
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between align-items-center px-4 pb-4 border-top-0">
+                <button type="button" class="btn btn-outline-secondary btn-lg px-4 rounded-3" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-2"></i> Close
+                </button>
+                @if (User.IsInRole("Admin"))
+                {
+                    <a id="downloadPreviewFallback" class="btn btn-primary btn-lg px-4 rounded-3 shadow-sm" href="#" download>
+                        <i class="fas fa-download me-2"></i> Download File
+                    </a>
+                }
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Loading Spinner -->
+<div id="loadingSpinner" class="d-none">
+    <div class="spinner-overlay">
+        <div class="spinner-container">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2 text-muted">Loading documents...</p>
+        </div>
+    </div>
+</div>
+
+
+
+@section Scripts {
+    <script src="~/js/jquery.min.js"></script>
+    <script src="~/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/xlsx.full.min.js"></script>
+    <script src="~/js/jquery.dataTables.min.js"></script>
+
+    <script>
+        const isAdmin = @User.IsInRole("Admin").ToString().ToLower();
+        
+        // Dynamically detect base URL
+        const appBasePath = window.location.pathname.split('/')[1] ? '/' + window.location.pathname.split('/')[1] : '';
+
+        document.addEventListener('DOMContentLoaded', function () {
+            console.log('DOM loaded, initializing table...');
+            
+            // Initialize the table first
+            const table = initEnhancedTable();
+            if (table) {
+                console.log('Table initialized successfully');
+                initEventListeners(table);
+                initDynamicFeatures();
+                initPreviewModalHandlers();
+            } else {
+                console.error('Failed to initialize table');
+            }
+        });
+
+        // ==================== TABLE CONFIGURATION ====================
+        function initEnhancedTable() {
+            if ($('#metadataTable').length === 0) {
+                console.warn('Table #metadataTable not found');
+                return null;
+            }
+
+            console.log('Initializing DataTable...');
+            
+            const table = $('#metadataTable').DataTable({
+                dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>rt<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+                lengthMenu: [[10, 25, 50, 100, 200, -1], [10, 25, 50, 100, 200, "All"]],
+                pageLength: 10,
+                responsive: true,
+                stateSave: true,
+                language: {
+                    search: "🔍 Search Documents:",
+                    searchPlaceholder: "Type here to filter...",
+                    lengthMenu: "_MENU_ records per page",
+                    info: "Showing _START_ to _END_ of _TOTAL_ documents",
+                    infoEmpty: "No documents available",
+                    infoFiltered: "(filtered from _MAX_ total documents)"
+                },
+                columnDefs: [
+                    { responsivePriority: 1, targets: [1, 2, 3] }, // SOP Number, File Name, Uploaded By
+                    { responsivePriority: 2, targets: [10] }, // Revision
+                    { responsivePriority: 3, targets: [11] }, // Preview buttons
+                    { orderable: false, targets: [11, 12] }, // Action columns
+                    { searchable: false, targets: [11, 12] } // Action columns
+                ],
+                initComplete: function () {
+                    console.log('DataTable initialization complete');
+                    updateVisibleCount(this);
+                }
+            });
+
+            table.on('draw.dt search.dt page.dt length.dt', function () {
+                updateVisibleCount(table);
+            });
+
+            return table;
+        }
+
+        // ==================== EVENT LISTENERS ====================
+        function initEventListeners(table) {
+            if (!table) {
+                console.error('Table not provided to initEventListeners');
+                return;
+            }
+
+            console.log('Initializing event listeners...');
+
+            // Initialize the filters module
+            const documentFilters = new DocumentFilters(table);
+            documentFilters.init();
+        }
+
+        // ==================== FILTERS MODULE ====================
+        class DocumentFilters {
+            constructor(table) {
+                this.table = table;
+            }
+
+            init() {
+                this.setupEventListeners();
+                console.log('DocumentFilters initialized');
+            }
+
+            setupEventListeners() {
+                this.setupSearch();
+                this.setupColumnFilters();
+                this.setupSpecialFilters();
+                this.setupDateFilters();
+                this.setupActionHandlers();
+            }
+
+            // Global search with debounce
+            setupSearch() {
+                let searchTimeout;
+                $('#globalSearch').on('input', (e) => {
+                    clearTimeout(searchTimeout);
+                    searchTimeout = setTimeout(() => {
+                        console.log('Global search:', e.target.value);
+                        this.table.search(e.target.value).draw();
+                    }, 300);
+                });
+            }
+
+            setupColumnFilters() {
+                // CORRECTED COLUMN INDEXES - based on your table structure
+                const filters = [
+                    { id: '#departmentFilter', column: 4 },        // Department (index 4)
+                    { id: '#docTypeFilter', column: 5 },           // Document Type (index 5)
+                    { id: '#authorFilter', column: 3 },            // Uploaded By (index 3)
+                    { id: '#supervisorFilter', column: 4 },        // Department column for supervisor filter
+                    { id: '#statusFilter', column: 9 }             // Status (index 9)
+                ];
+
+                filters.forEach(config => {
+                    $(config.id).on('change', (e) => {
+                        console.log(`Filter ${config.id} changed:`, e.target.value, 'Column:', config.column);
+                        this.table.column(config.column).search(e.target.value).draw();
+                    });
+                });
+            }
+
+            setupSpecialFilters() {
+                // File Type Filter - File Name is column 2
+                $('#fileTypeFilter').on('change', (e) => {
+                    const value = e.target.value;
+                    console.log('File type filter:', value);
+                    const regexMap = {
+                        'pdf': '\\.pdf',
+                        'video': '\\.(mp4|avi|mov|wmv|flv|webm)',
+                        'other': '^(?!.*\\.(pdf|mp4|avi|mov|wmv|flv|webm)).*$'
+                    };
+                    this.table.column(2).search(regexMap[value] || '', true, false, true).draw();
+                });
+            }
+
+            setupDateFilters() {
+                // Date filters with CORRECTED column indexes
+                $('#dateFromFilter, #dateToFilter').on('change', () => {
+                    console.log('Last review date filter changed');
+                    this.applyDateFilter(6, 'lastReviewDateFilter'); // Last Review is column 6
+                });
+
+                $('#effectiveDateFromFilter, #effectiveDateToFilter').on('change', () => {
+                    console.log('Next review date filter changed');
+                    this.applyDateFilter(8, 'effectiveDateFilter'); // Next Review is column 8
+                });
+            }
+
+            setupActionHandlers() {
+                // Action buttons
+                $('#clearAllFilters, #resetView').on('click', () => {
+                    console.log('Clearing all filters');
+                    this.clearAllFilters();
+                });
+
+                $('#exportExcel').on('click', () => {
+                    console.log('Exporting to Excel');
+                    this.exportToExcel();
+                });
+            }
+
+            // ==================== FILTER METHODS ====================
+            applyDateFilter(columnIndex, filterName) {
+                console.log(`Applying date filter: ${filterName}, column: ${columnIndex}`);
+
+                // Remove existing date filters with this name
+                $.fn.dataTable.ext.search = $.fn.dataTable.ext.search.filter(fn =>
+                    !fn.name || fn.name !== filterName
+                );
+
+                const dateFilter = (settings, data, dataIndex) => {
+                    let dateFrom, dateTo;
+
+                    if (filterName === 'lastReviewDateFilter') {
+                        dateFrom = $('#dateFromFilter').val();
+                        dateTo = $('#dateToFilter').val();
+                    } else if (filterName === 'effectiveDateFilter') {
+                        dateFrom = $('#effectiveDateFromFilter').val();
+                        dateTo = $('#effectiveDateToFilter').val();
+                    }
+
+                    console.log(`Date filter values - From: ${dateFrom}, To: ${dateTo}`);
+
+                    // If no date filters are set, show all rows
+                    if (!dateFrom && !dateTo) return true;
+
+                    try {
+                        const row = this.table.row(dataIndex).node();
+                        if (!row) {
+                            console.log('No row found for index:', dataIndex);
+                            return false;
+                        }
+
+                        const dateCell = row.cells[columnIndex];
+                        const dateOrder = dateCell?.getAttribute('data-order');
+
+                        console.log(`Row ${dataIndex} date order:`, dateOrder);
+
+                        if (!dateOrder || dateOrder === '') {
+                            console.log('No date order found for row:', dataIndex);
+                            return false;
+                        }
+
+                        // Parse date from yyyyMMdd format
+                        const year = dateOrder.substring(0, 4);
+                        const month = dateOrder.substring(4, 6);
+                        const day = dateOrder.substring(6, 8);
+
+                        // Validate date components
+                        if (!year || !month || !day) {
+                            console.log('Invalid date components for row:', dataIndex);
+                            return false;
+                        }
+
+                        const rowDate = new Date(year, month - 1, day);
+                        if (isNaN(rowDate.getTime())) {
+                            console.log('Invalid date for row:', dataIndex);
+                            return false;
+                        }
+
+                        rowDate.setHours(0, 0, 0, 0);
+
+                        const fromDate = dateFrom ? new Date(dateFrom) : null;
+                        const toDate = dateTo ? new Date(dateTo) : null;
+
+                        if (fromDate) {
+                            fromDate.setHours(0, 0, 0, 0);
+                            if (rowDate < fromDate) {
+                                console.log(`Row ${dataIndex} date ${rowDate} is before fromDate ${fromDate}`);
+                                return false;
+                            }
+                        }
+
+                        if (toDate) {
+                            toDate.setHours(23, 59, 59, 999);
+                            if (rowDate > toDate) {
+                                console.log(`Row ${dataIndex} date ${rowDate} is after toDate ${toDate}`);
+                                return false;
+                            }
+                        }
+
+                        console.log(`Row ${dataIndex} passed date filter`);
+                        return true;
+
+                    } catch (e) {
+                        console.error('Error parsing date for row', dataIndex, ':', e);
+                        return false;
+                    }
+                };
+
+                dateFilter.name = filterName;
+                $.fn.dataTable.ext.search.push(dateFilter);
+                this.table.draw();
+                console.log('Date filter applied and table redrawn');
+            }
+
+            clearAllFilters() {
+                console.log('Clearing all filters...');
+                
+                // Reset all filter inputs
+                $('select[id$="Filter"], input[type="date"][id$="Filter"]').val('');
+                $('#globalSearch').val('');
+
+                if (this.table) {
+                    this.table.search('').columns().search('').draw();
+
+                    // Remove all custom filters
+                    $.fn.dataTable.ext.search = [];
+                    this.table.draw();
+
+                    this.updateVisibleCount();
+                    
+                    // Visual feedback
+                    this.showClearFiltersFeedback();
+                }
+            }
+
+            updateVisibleCount() {
+                try {
+                    const visibleCount = this.table.rows({ search: 'applied' }).count();
+                    const totalCount = this.table.rows().count();
+                    
+                    console.log(`Visible: ${visibleCount}, Total: ${totalCount}`);
+                    
+                    $('#visibleCount').text(visibleCount.toLocaleString());
+                    $('#totalCount').text(totalCount.toLocaleString());
+                } catch (error) {
+                    console.warn('Could not update visible count:', error);
+                }
+            }
+
+            showClearFiltersFeedback() {
+                $('#clearAllFilters').addClass('btn-success').removeClass('btn-light');
+                setTimeout(() => {
+                    $('#clearAllFilters').removeClass('btn-success').addClass('btn-light');
+                }, 1000);
+            }
+
+            exportToExcel() {
+                try {
+                    if (typeof XLSX === 'undefined') {
+                        throw new Error('Excel export library not loaded.');
+                    }
+
+                    const filteredData = this.table.rows({ search: 'applied' }).data();
+                    if (filteredData.length === 0) {
+                        alert('No data available to export.');
+                        return;
+                    }
+
+                    const exportData = [
+                        ['SOP Number', 'File Name', 'Uploaded By', 'Department', 'Document Type',
+                         'Last Review', 'Upload Date', 'Next Review', 'Status', 'Revision', 'Description']
+                    ];
+
+                    filteredData.each((value, index) => {
+                        const rowData = [];
+                        for (let i = 0; i < value.length; i++) {
+                            let cellValue = value[i] || '';
+                            if (typeof cellValue === 'string') {
+                                cellValue = cellValue.replace(/<[^>]*>/g, '').trim();
+                            }
+                            rowData.push(cellValue);
+                        }
+                        exportData.push(rowData);
+                    });
+
+                    const wb = XLSX.utils.book_new();
+                    const ws = XLSX.utils.aoa_to_sheet(exportData);
+
+                    const colWidths = exportData[0].map((_, colIndex) => {
+                        const maxLength = Math.max(...exportData.map(row =>
+                            row[colIndex] ? row[colIndex].toString().length : 0
+                        ));
+                        return { wch: Math.min(Math.max(maxLength, 10), 50) };
+                    });
+                    ws['!cols'] = colWidths;
+
+                    XLSX.utils.book_append_sheet(wb, ws, 'SOP Documents');
+
+                    const timestamp = new Date().toISOString().split('T')[0];
+                    const filename = `SOP_Documents_Export_${timestamp}.xlsx`;
+
+                    XLSX.writeFile(wb, filename);
+
+                    console.log(`Successfully exported ${exportData.length - 1} records to ${filename}`);
+
+                } catch (error) {
+                    console.error('Export to Excel failed:', error);
+                    alert('Error exporting to Excel: ' + error.message);
+                }
+            }
+        }
+
+       // ==================== PREVIEW MODAL HANDLERS ====================
+       function initPreviewModalHandlers() {
+            // Remove any existing handlers first
+            $(document).off('click', '.preview-choice-btn');
+    
+            // Attach new handler
+            $(document).on('click', '.preview-choice-btn', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+        
+                const $this = $(this);
+                const fileData = {
+                    fileName: $this.data('file-name'),
+                    downloadUrl: $this.data('download-url'),
+                    originalFile: $this.data('original-file'),
+                    sopFileName: $this.data('sop-file-name'),
+                    videoPath: $this.data('video-path'),
+                    docType: $this.data('doc-type') || ''
+                };
+
+                console.log('Preview clicked:', fileData);
+
+                const availability = detectFileAvailabilityClientSide(
+                    fileData.originalFile, 
+                    fileData.sopFileName, 
+                    fileData.videoPath, 
+                    fileData.docType
+                );
+
+                console.log('File availability:', availability);
+        
+                openChoosePreviewModal(
+                    availability.pdfUrl,
+                    availability.videoUrl,
+                    fileData.fileName,
+                    fileData.downloadUrl,
+                    fileData.originalFile
+                );
+            });
+
+            // Handle video modal cleanup
+            $('#videoModal').on('hidden.bs.modal', cleanupVideoModal);
+        }
+
+        // Initialize when page loads
+        $(document).ready(function() {
+            initPreviewModalHandlers();
+        });
+
+        // Utility function to validate file
+        function isValidFile(file) {
+            return file && 
+                   file.trim() !== "" && 
+                   file.toLowerCase() !== "n/a" && 
+                   file.toLowerCase() !== "null";
+        }
+
+        function detectFileAvailabilityClientSide(originalFile, sopFileName, videoPath, docType = '') {
+            const result = {
+                hasPdf: false,
+                hasVideo: false,
+                pdfUrl: null,
+                videoUrl: null,
+                pdfFileName: null
+            };
+
+            // PDF Detection
+            let pdfFileName = null;
+    
+            // Check original file first
+            if (isValidFile(originalFile) && originalFile.toLowerCase().endsWith('.pdf')) {
+                pdfFileName = originalFile;
+            } 
+            // Fall back to SOP file
+            else if (isValidFile(sopFileName) && sopFileName.toLowerCase().endsWith('.pdf')) {
+                pdfFileName = sopFileName;
+            }
+
+            if (pdfFileName) {
+                result.hasPdf = true;
+                result.pdfFileName = pdfFileName;
+        
+                const encodedFileName = encodeURIComponent(pdfFileName);
+                const encodedDocType = docType ? `&docType=${encodeURIComponent(docType)}` : "";
+                result.pdfUrl = `${appBasePath}/FileAccess/GetPdf?fileName=${encodedFileName}${encodedDocType}`;
+            }
+
+            // Video Detection
+            if (isValidFile(videoPath)) {
+                result.hasVideo = true;
+                const encodedVideo = encodeURIComponent(videoPath);
+                result.videoUrl = `${appBasePath}/FileAccess/GetVideo?videoPath=${encodedVideo}`;
+            }
+
+            return result;
+        }
+
+        function previewDocument(btn) {
+            const data = {
+                originalFile: btn.getAttribute("data-original-file"),
+                sopFileName: btn.getAttribute("data-sop-file-name"),
+                videoPath: btn.getAttribute("data-video-path"),
+                docType: btn.getAttribute("data-doc-type") || ''
+            };
+
+            const result = detectFileAvailabilityClientSide(
+                data.originalFile, 
+                data.sopFileName, 
+                data.videoPath, 
+                data.docType
+            );
+
+            // Always open the choice modal first
+            const downloadUrl = btn.getAttribute("data-download-url") || '';
+            const fileName = btn.getAttribute("data-file-name") || '';
+    
+            openChoosePreviewModal(
+                result.pdfUrl,
+                result.videoUrl,
+                fileName,
+                downloadUrl,
+                data.originalFile
+            );
+        }
+
+        function openChoosePreviewModal(pdfUrl, videoUrl, fileName = '', downloadUrl = '', originalFile = '') {
+            const $body = $('#choosePreviewBody');
+            if (!$body.length) return;
+
+            $body.empty();
+
+            const hasPdf = pdfUrl && pdfUrl.trim() !== "";
+            const hasVideo = videoUrl && videoUrl.trim() !== "";
+    
+            let modalContent = '';
+    
+            if (hasPdf && hasVideo) {
+                modalContent = `
+                    <div class="d-flex flex-column align-items-center py-4">
+                        <h4 class="mb-4 text-dark fw-bold">Choose Preview Type</h4>
+                        <p class="text-muted mb-4">This document has multiple preview options available.</p>
+                        <div class="d-flex justify-content-center gap-4 flex-wrap">
+                            <button type="button" class="btn btn-outline-primary btn-lg" id="previewPdfBtn">
+                                <i class="fas fa-file-pdf me-2"></i>Display PDF
+                            </button>
+                            <button type="button" class="btn btn-outline-info btn-lg" id="previewVideoBtn">
+                                <i class="fas fa-play me-2"></i>Play Video
+                            </button>
+                        </div>
+                    </div>`;
+            } 
+            else if (hasPdf) {
+                modalContent = `
+                    <div class="d-flex flex-column align-items-center py-4">
+                        <h4 class="mb-4 text-dark fw-bold">PDF Preview Available</h4>
+                        <div class="d-flex justify-content-center">
+                            <button type="button" class="btn btn-outline-primary btn-lg" id="displayPdfBtn">
+                                <i class="fas fa-file-pdf me-2"></i>Display PDF
+                            </button>
+                        </div>
+                    </div>`;
+            } 
+            else if (hasVideo) {
+                modalContent = `
+                    <div class="d-flex flex-column align-items-center py-4">
+                        <h4 class="mb-4 text-dark fw-bold">Video Preview Available</h4>
+                        <div class="d-flex justify-content-center">
+                            <button type="button" class="btn btn-outline-info btn-lg" id="playVideoBtn">
+                                <i class="fas fa-play me-2"></i>Play Video
+                            </button>
+                        </div>
+                    </div>`;
+            } 
+            else {
+                modalContent = createNoPreviewContent();
+            }
+
+            $body.html(modalContent);
+    
+            // Set download button URL if admin
+            if (downloadUrl) {
+                $('#downloadPreview').attr('href', downloadUrl);
+            }
+    
+            // Show modal
+            const chooseModal = bootstrap.Modal.getOrCreateInstance($('#choosePreviewModal')[0]);
+            chooseModal.show();
+    
+            // Attach event handlers directly
+            setTimeout(() => {
+                if (hasPdf) {
+                    $('#previewPdfBtn, #displayPdfBtn').off('click').on('click', function() {
+                        chooseModal.hide();
+                        openPdfPreview(pdfUrl);
+                    });
+                }
+        
+                if (hasVideo) {
+                    $('#previewVideoBtn, #playVideoBtn').off('click').on('click', function() {
+                        chooseModal.hide();
+                        openVideoPreview(videoUrl);
+                    });
+                }
+            }, 50);
+        }
+
+        function createModalContent(config) {
+            const buttonsHtml = config.buttons.map(btn => `
+                <button type="button" class="btn ${btn.classes}" id="${btn.id}">
+                    <i class="fas fa-${btn.icon} me-2"></i>${btn.text}
+                </button>
+            `).join('');
+
+            return `
+                <div class="d-flex flex-column align-items-center py-4">
+                    <h4 class="mb-4 text-dark fw-bold">${config.title}</h4>
+                    ${config.description ? `<p class="text-muted mb-4">${config.description}</p>` : ''}
+                    <div class="d-flex justify-content-center gap-4 flex-wrap">
+                        ${buttonsHtml}
+                    </div>
+                </div>`;
+        }
+
+        function createNoPreviewContent() {
+            return `
+                <div class="d-flex flex-column align-items-center py-5">
+                    <i class="fas fa-exclamation-circle text-warning mb-4" style="font-size: 4rem;"></i>
+                    <h4 class="mb-3 text-dark fw-bold">Preview Not Available</h4>
+                    <p class="text-muted fs-5 mb-4">No preview available for this document.</p>
+                    <div class="alert alert-warning w-75">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Supported preview formats: PDF or video files
+                    </div>
+                </div>`;
+        }
+
+        function openPdfPreview(url) {
+            if (!url) {
+                showUnsupportedPreview();
+                return;
+            }
+            // Option 1: Direct navigation (current behavior)
+            //window.location.href = url;
+    
+            // Option 2: Open in new tab (alternative)
+            // window.open(url, '_blank');
+    
+            // Option 3: Show in modal (if you want inline PDF viewing)
+             showPdfInModal(url);
+        }
+
+        function showPdfInModal(url) {
+            const modalHtml = `
+                <div class="modal fade" id="pdfModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-xl modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">PDF Preview</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body p-0" style="height: 80vh;">
+                                <iframe src="${url}" style="width: 100%; height: 100%; border: none;"></iframe>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                <a href="${url}" class="btn btn-primary" download>Download</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+    
+            // Remove existing modal if any
+            $('#pdfModal').remove();
+    
+            // Append new modal and show it
+            $('body').append(modalHtml);
+            const pdfModal = new bootstrap.Modal(document.getElementById('pdfModal'));
+            pdfModal.show();
+    
+            // Cleanup on hide
+            $('#pdfModal').on('hidden.bs.modal', function() {
+                $(this).remove();
+            });
+        }
+
+        function openVideoPreview(url) {
+            if (!url) {
+                showUnsupportedPreview();
+                return;
+            }
+    
+            const videoModal = document.getElementById('videoModal');
+            const modalVideo = document.getElementById('modalVideo');
+    
+            if (videoModal && modalVideo) {
+                // Reset video
+                modalVideo.pause();
+                modalVideo.currentTime = 0;
+                modalVideo.src = url;
+        
+                // Show modal
+                const bsModal = new bootstrap.Modal(videoModal);
+                bsModal.show();
+            } else {
+                console.error('Video modal elements not found');
+                showUnsupportedPreview();
+            }
+        }
+
+        function cleanupVideoModal() {
+            const video = document.getElementById('modalVideo');
+            if (video) {
+                video.pause();
+                video.currentTime = 0;
+                video.removeAttribute('src');
+                video.load();
+            }
+        }
+
+        function showNoPreviewAlert() {
+            // Using Bootstrap Toast for better UX (optional)
+            if (typeof bootstrap !== 'undefined' && bootstrap.Toast) {
+                const toastEl = document.getElementById('noPreviewToast');
+                if (toastEl) {
+                    const toast = new bootstrap.Toast(toastEl);
+                    toast.show();
+                } else {
+                    alert("No preview available for this document.");
+                }
+            } else {
+                alert("No preview available for this document.");
+            }
+        }
+
+        function showUnsupportedPreview() {
+            const unsupportedModal = document.getElementById('docPreviewModal');
+            if (unsupportedModal) {
+                const modal = new bootstrap.Modal(unsupportedModal);
+                modal.show();
+            } else {
+                showNoPreviewAlert();
+            }
+        }
+
+        // Helper function to find button config (in a real implementation, you'd store this differently)
+        function findButtonConfig(buttonId) {
+            // This would be implemented based on how you track button configurations
+            return null;
+        }
+
+        // ==================== UTILITY FUNCTIONS ====================
+        function updateVisibleCount(table) {
+            if (!table) return;
+            try {
+                const pageInfo = table.page.info();
+                const visibleCount = pageInfo.recordsDisplay;
+                const totalCount = pageInfo.recordsTotal;
+                $('#visibleCount').text(visibleCount.toLocaleString());
+                $('#totalCount').text(totalCount.toLocaleString());
+            } catch (error) {
+                console.warn('Could not update visible count:', error);
+            }
+        }
+
+        function initDynamicFeatures() {
+            // Loading states
+            $(document).ajaxStart(function () {
+                $('#loadingSpinner').removeClass('d-none');
+            }).ajaxStop(function () {
+                $('#loadingSpinner').addClass('d-none');
+            });
+
+            // Initialize tooltips
+            if ($.fn.tooltip) {
+                $('[data-bs-toggle="tooltip"]').tooltip({
+                    trigger: 'hover',
+                    placement: 'top'
+                });
+            }
+        }
+    </script>
+}
+
+@section Styles {
+    <link rel="stylesheet" href="~/css/bootstrap.min.css">
+    <link rel="stylesheet" href="~/css/font-awesome.min.css">
+    <link rel="stylesheet" href="~/css/jquery.dataTables.min.css">
+
+    <style>
+        :root {
+            --primary: #3498db;
+            --primary-dark: #023e8a;
+            --secondary: #2c3e50;
+            --accent: #e74c3c;
+            --success: #27ae60;
+            --warning: #f39c12;
+            --danger: #e74c3c;
+            --light: #f8f9fa;
+            --light-bg: #f8f9fa;
+            --dark-text: #2c3e50;
+            --light-text: #7f8c8d;
+            --dark: #2c3e50;
+            --info: #3498db;
+            --text-muted: #7f8c8d;
+            --border-radius: 0.5rem;
+            --transition: all 0.3s ease-in-out;
+        }
+
+        body {
+            background: #f4f6f8;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--dark-text);
+        }
+
+        .sop-table-container {
+            background: #fff;
+            border-radius: var(--border-radius);
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+
+        /* HEADER SECTION */
+        .table-header {
+            background: linear-gradient(135deg, var(--secondary), var(--primary));
+            color: #fff;
+            padding: 2rem;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            border-radius: 10px 10px 0 0;
+        }
+
+        .header-content h5 {
+            font-weight: 700;
+        }
+
+        .header-content p {
+            color: rgba(255,255,255,0.8);
+            font-size: 0.9rem;
+        }
+
+        .header-icon {
+            background: rgba(255,255,255,0.15);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1rem;
+            font-size: 1.6rem;
+        }
+
+        .document-stats .badge {
+            font-size: 0.8rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.15);
+            border: none;
+            color: #fff;
+            transition: var(--transition);
+        }
+
+            .btn-secondary:hover {
+                background: rgba(255,255,255,0.3);
+                color: #fff;
+            }
+
+
+        /* CONTROL PANEL */
+        .table-controls {
+            padding: 1.5rem;
+            background: linear-gradient(135deg, var(--secondary), var(--primary));
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .search-box input {
+            border-right: none;
+        }
+
+        .search-box .btn {
+            border-left: none;
+        }
+
+        .btn-outline-secondary {
+            transition: var(--transition);
+        }
+
+            .btn-outline-secondary:hover {
+                background: var(--secondary);
+                color: darkslategrey;
+            }
+
+        /* FILTER SECTION */
+
+        #metadataTable_filter {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+            #metadataTable_filter input {
+                width: 250px !important;
+            }
+
+
+        .filter-section {
+            background: #fafafa;
+            padding: 1.25rem 1.5rem;
+            border-bottom: 1px solid #eee;
+        }
+
+        .filter-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .filter-row label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        /* TABLE */
+        .user-info {
+            color: #000 !important;   /* Dark text */
+        }
+
+        .table-section {
+            background: white;
+        }
+
+        #metadataTable thead {
+            background: var(--primary-dark);
+            color: white;
+            font-size: 0.9rem;
+        }
+
+        #metadataTable tbody tr:hover {
+            background-color: #f1f9ff;
+            cursor: pointer;
+        }
+
+        .document-info .document-title {
+            font-weight: 600;
+        }
+
+        .sop-number {
+            background: #eef5fb;
+            color: var(--primary-dark);
+            padding: 0.3rem 0.6rem;
+            border-radius: 0.25rem;
+            font-family: monospace;
+            font-size: 0.85rem;
+        }
+
+        .revision-badge {
+            background: #fff3cd;
+            color: #856404;
+            padding: 0.3rem 0.5rem;
+            border-radius: 0.25rem;
+            font-weight: 600;
+        }
+
+        .status-badge {
+            border-radius: 0.5rem;
+            padding: 0.4rem 0.7rem;
+            font-size: 0.8rem;
+        }
+
+        .badge.bg-success {
+            background-color: var(--success) !important;
+        }
+
+        .badge.bg-warning {
+            background-color: var(--warning) !important;
+        }
+
+        .badge.bg-danger {
+            background-color: var(--danger) !important;
+        }
+
+        .department-badge {
+            background: #ecf0f1;
+            padding: 0.3rem 0.5rem;
+            border-radius: 0.3rem;
+            font-size: 0.8rem;
+            color: var(--dark);
+        }
+
+        /* ACTION BUTTONS */
+        .action-buttons {
+        min-height: 40px;
+        }
+    
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+            transition: all 0.2s ease-in-out;
+            padding: 0;
+            flex-shrink: 0;
+        }
+    
+        .action-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+    
+        .action-btn i {
+            font-size: 0.9rem;
+            margin: 0;
+        }
+    
+        /* Specific button colors for better visual hierarchy */
+        .btn-outline-primary { border-color: #0d6efd; color: #0d6efd; }
+        .btn-outline-success { border-color: #198754; color: #198754; }
+        .btn-outline-info { border-color: #0dcaf0; color: #0dcaf0; }
+        .btn-outline-danger { border-color: #dc3545; color: #dc3545; }
+        .btn-outline-warning { border-color: #ffc107; color: #d39e00; }
+    
+        .btn-outline-primary:hover { background-color: #0d6efd; color: white; }
+        .btn-outline-success:hover { background-color: #198754; color: white; }
+        .btn-outline-info:hover { background-color: #0dcaf0; color: white; }
+        .btn-outline-danger:hover { background-color: #dc3545; color: white; }
+        .btn-outline-warning:hover { background-color: #ffc107; color: black; }
+
+        /* FOOTER */
+        .table-footer {
+            background: #fff;
+            padding: 1rem 1.5rem;
+            border-top: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        /* EMPTY STATE */
+        .empty-state i {
+            opacity: 0.6;
+        }
+
+        .empty-state h5 {
+            font-weight: 600;
+        }
+
+        /* MODAL */
+        .modal-content {
+            border-radius: var(--border-radius);
+            overflow: hidden;
+        }
+
+        .modal-header {
+            background: var(--danger);
+            color: white;
+        }
+
+        .modal-footer button {
+            border-radius: 0.4rem;
+        }
+
+        /* SPINNER */
+        .spinner-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        #clearAllFilters {
+            transition: all 0.25s ease-in-out;
+            border-radius: 0.4rem;
+        }
+
+            #clearAllFilters:hover {
+                background-color: #e3f2fd;
+                border-color: #0077b6;
+                color: #0077b6;
+                transform: translateY(-1px);
+            }
+
+    </style>
+}

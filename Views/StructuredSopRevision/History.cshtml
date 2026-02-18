@@ -1,0 +1,32 @@
+﻿@model IEnumerable<SOPMSApp.Models.DocRegisterHistory>
+@{
+    ViewData["Title"] = "Revision History";
+}
+
+<h2>Revision History for @ViewBag.SopTitle</h2>
+
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Revision</th>
+            <th>Effective Date</th>
+            <th>Revised By</th>
+            <th>Revised On</th>
+            <th>Document Type</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var history in Model)
+        {
+            <tr>
+                <td>@history.Revision</td>
+                <td>@history.EffectiveDate?.ToString("yyyy-MM-dd")</td>
+                <td>@history.RevisedBy</td>
+                <td>@history.RevisedOn.ToString("yyyy-MM-dd HH:mm")</td>
+                <td>@history.DocumentType</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<a asp-action="Index" class="btn btn-secondary mt-3">Back to List</a>

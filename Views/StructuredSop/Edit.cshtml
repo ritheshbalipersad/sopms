@@ -1,0 +1,1421 @@
+﻿@model SopEditViewModel
+
+@{
+    ViewData["Title"] = "Edit SOP";
+}
+@if (User.Identity.IsAuthenticated && User.IsInRole("Admin") || User.IsInRole("Manager") || User.IsInRole("Technician"))
+{
+    <div class="container">
+        <form asp-action="Edit" method="post" enctype="multipart/form-data" class="p-5 mb-5">
+            <h2>Edit Structured Document</h2>
+
+            <div class="form-group mt-4">
+                <button type="submit" class="btn btn-primary">Save/Preview Changes</button>
+                <a asp-action="Details" asp-route-id="@Model.Id" class="btn btn-secondary">Cancel</a>
+            </div>
+            <hr />
+
+            @if (TempData["Warning"] != null)
+            {
+                <div class="alert alert-warning">
+                    @TempData["Warning"]
+                </div>
+            }
+
+            <input type="hidden" asp-for="Id" />
+            <input type="hidden" asp-for="SopNumber" />
+
+            <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label asp-for="SopNumber" class="control-label"></label>
+                        <input asp-for="SopNumber" class="form-control" readonly/>
+                        <span asp-validation-for="SopNumber" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label asp-for="Title" class="control-label"></label>
+                        <input asp-for="Title" class="form-control" />
+                        <span asp-validation-for="Title" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label asp-for="Revision" class="control-label"></label>
+                        <input asp-for="Revision" class="form-control" />
+                        <span asp-validation-for="Revision" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-3">
+                <div class="col-md-12">
+                    <div class="form-group">
+                        <label class="form-label fw-semibold">
+                            <i class="fas fa-calendar-alt me-2 text-primary"></i> Effective Period <span class="text-danger">*</span>
+                        </label>
+                        <p class="small text-muted mb-3">Select how many years this revision should remain effective</p>
+
+                        <div class="btn-group w-100 mb-2" role="group">
+                            @for (int i = 1; i <= 7; i++)
+                            {
+                                <input type="radio"
+                                       class="btn-check"
+                                       name="yearOption"
+                                       id="yearOption@(i)"
+                                       value="@i"
+                                       onchange="setEffectiveDate()"
+                                       @(Model.EffectiveDate.Year == DateTime.Now.AddYears(i).Year ? "checked" : "") />
+                                <label class="btn btn-outline-primary" for="yearOption@(i)">
+                                    @i Year@(i > 1 ? "s" : "")
+                                </label>
+                            }
+                        </div>
+                        <div class="invalid-feedback d-block">
+                            Please select an effective period.
+                        </div>
+
+                        <div class="form-floating mt-3">
+                            <input type="text" id="EffectiveDateDisplay" class="form-control" readonly placeholder=" " 
+                                   value="@(Model.EffectiveDate.ToString("MMMM dd, yyyy"))" />
+                            <label for="EffectiveDateDisplay">Effective Period</label>
+                        </div>
+
+                        <input type="hidden" asp-for="EffectiveDate" id="EffectiveDate" />
+                        <span asp-validation-for="EffectiveDate" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-3">
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label asp-for="ControlledBy" class="control-label"></label>
+                        <input asp-for="ControlledBy" class="form-control" value="@Model.ControlledBy" />
+                        <span asp-validation-for="ControlledBy" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label asp-for="DocType" class="control-label"></label>
+                        <select asp-for="DocType" class="form-control" asp-items="ViewBag.Documents">
+                            <option value="">-- Select Document Type --</option>
+                        </select>
+                        <span asp-validation-for="DocType" class="text-danger"></span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="form-group">
+                        <label class="control-label">Areas</label>
+                        <select asp-for="SelectedAreas" class="form-control select2" multiple="multiple"
+                                asp-items="ViewBag.Areas">
+                        </select>
+                        <span asp-validation-for="SelectedAreas" class="text-danger"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-4">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Steps</h5>
+                    <button type="button" id="add-step" class="btn btn-sm btn-primary">Add Step</button>
+                </div>
+                <div class="card-body">
+                    <div id="steps-container">
+                        @if (Model.Steps != null && Model.Steps.Any())
+                        {
+                            for (int i = 0; i < Model.Steps.Count; i++)
+                            {
+                                <div class="step-card card mb-3" data-step-id="@Model.Steps[i].Id" data-step-index="@i">
+                                <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                                    <div class="step-handle" style="cursor: grab;">
+                                        <i class="fas fa-arrows-alt me-2 text-muted"></i>
+                                        <h6 class="mb-0 d-inline">Step <span class="step-number-display">@Model.Steps[i].StepNumber</span></h6>
+                                    </div>
+                                    <div>
+                                        <button type="button" class="btn btn-sm btn-outline-primary add-step-between me-1" title="Add Step After">
+                                            <i class="fas fa-plus"></i>Add Step below
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-danger remove-step">
+                                            <i class="fas fa-trash-alt me-1"></i> Remove
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <input type="hidden" asp-for="@Model.Steps[i].Id" class="fw-bold" />
+                                    <input type="hidden" asp-for="@Model.Steps[i].StepNumber" class="step-number-input" />
+
+                                    <!-- Instructions with Rich Text Editor -->
+                                    <div class="form-group mb-3">
+                                        <label asp-for="@Model.Steps[i].Instructions" class="fw-bold"></label>
+                                        <div class="rich-text-toolbar mb-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="bold" title="Bold">
+                                                <i class="fas fa-bold"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="italic" title="Italic">
+                                                <i class="fas fa-italic"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="underline" title="Underline">
+                                                <i class="fas fa-underline"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="insertUnorderedList" title="Bullet List">
+                                                <i class="fas fa-list-ul"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="insertOrderedList" title="Numbered List">
+                                                <i class="fas fa-list-ol"></i>
+                                            </button>
+                                            <div class="btn-group">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" title="Text Color">
+                                                    <i class="fas fa-palette"></i>
+                                                </button>
+                                                <div class="dropdown-menu p-2 color-palette">
+                                                    <div class="d-flex flex-wrap" style="width: 150px;">
+                                                        <button type="button" class="color-btn m-1" data-color="#dc3545" style="background-color: #dc3545; width: 20px; height: 20px; border: 1px solid #ccc;" title="Red"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#fd7e14" style="background-color: #fd7e14; width: 20px; height: 20px; border: 1px solid #ccc;" title="Orange"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#ffc107" style="background-color: #ffc107; width: 20px; height: 20px; border: 1px solid #ccc;" title="Yellow"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#198754" style="background-color: #198754; width: 20px; height: 20px; border: 1px solid #ccc;" title="Green"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#0dcaf0" style="background-color: #0dcaf0; width: 20px; height: 20px; border: 1px solid #ccc;" title="Cyan"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#0d6efd" style="background-color: #0d6efd; width: 20px; height: 20px; border: 1px solid #ccc;" title="Blue"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#6f42c1" style="background-color: #6f42c1; width: 20px; height: 20px; border: 1px solid #ccc;" title="Purple"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#000000" style="background-color: #000000; width: 20px; height: 20px; border: 1px solid #ccc;" title="Black"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#6c757d" style="background-color: #6c757d; width: 20px; height: 20px; border: 1px solid #ccc;" title="Gray"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#ffffff" style="background-color: #ffffff; width: 20px; height: 20px; border: 1px solid #ccc;" title="White"></button>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger mt-2 w-100 remove-color-btn" title="Remove Color">
+                                                            <i class="fas fa-eraser me-1"></i> Remove Color
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="rich-text-editor form-control"
+                                             contenteditable="true"
+                                             data-target="Steps[@i].Instructions"
+                                             placeholder="Describe what to do in this step...">
+                                            @Html.Raw(Model.Steps[i].Instructions)
+                                        </div>
+                                        <textarea asp-for="@Model.Steps[i].Instructions" class="d-none rich-text-area"></textarea>
+                                        <span asp-validation-for="@Model.Steps[i].Instructions" class="text-danger"></span>
+                                    </div>
+
+                                    <!-- Key Points with Rich Text Editor (Optional) -->
+                                    <div class="form-group mb-3">
+                                        <label asp-for="@Model.Steps[i].KeyPoints" class="fw-bold">Key Points (Optional)</label>
+                                        <div class="rich-text-toolbar mb-2">
+                                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="bold" title="Bold">
+                                                <i class="fas fa-bold"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="italic" title="Italic">
+                                                <i class="fas fa-italic"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="underline" title="Underline">
+                                                <i class="fas fa-underline"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="insertUnorderedList" title="Bullet List">
+                                                <i class="fas fa-list-ul"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="insertOrderedList" title="Numbered List">
+                                                <i class="fas fa-list-ol"></i>
+                                            </button>
+                                            <div class="btn-group">
+                                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" title="Text Color">
+                                                    <i class="fas fa-palette"></i>
+                                                </button>
+                                                <div class="dropdown-menu p-2 color-palette">
+                                                    <div class="d-flex flex-wrap" style="width: 150px;">
+                                                        <button type="button" class="color-btn m-1" data-color="#dc3545" style="background-color: #dc3545; width: 20px; height: 20px; border: 1px solid #ccc;" title="Red"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#fd7e14" style="background-color: #fd7e14; width: 20px; height: 20px; border: 1px solid #ccc;" title="Orange"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#ffc107" style="background-color: #ffc107; width: 20px; height: 20px; border: 1px solid #ccc;" title="Yellow"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#198754" style="background-color: #198754; width: 20px; height: 20px; border: 1px solid #ccc;" title="Green"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#0dcaf0" style="background-color: #0dcaf0; width: 20px; height: 20px; border: 1px solid #ccc;" title="Cyan"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#0d6efd" style="background-color: #0d6efd; width: 20px; height: 20px; border: 1px solid #ccc;" title="Blue"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#6f42c1" style="background-color: #6f42c1; width: 20px; height: 20px; border: 1px solid #ccc;" title="Purple"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#000000" style="background-color: #000000; width: 20px; height: 20px; border: 1px solid #ccc;" title="Black"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#6c757d" style="background-color: #6c757d; width: 20px; height: 20px; border: 1px solid #ccc;" title="Gray"></button>
+                                                        <button type="button" class="color-btn m-1" data-color="#ffffff" style="background-color: #ffffff; width: 20px; height: 20px; border: 1px solid #ccc;" title="White"></button>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger mt-2 w-100 remove-color-btn" title="Remove Color">
+                                                            <i class="fas fa-eraser me-1"></i> Remove Color
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="rich-text-editor form-control"
+                                             contenteditable="true"
+                                             data-target="Steps[@i].KeyPoints"
+                                             placeholder="Highlight important notes or tips (optional)...">
+                                            @Html.Raw(Model.Steps[i].KeyPoints)
+                                        </div>
+                                        <textarea asp-for="@Model.Steps[i].KeyPoints" class="d-none rich-text-area"></textarea>
+                                        <span asp-validation-for="@Model.Steps[i].KeyPoints" class="text-danger"></span>
+                                    </div>
+
+                                    <div class="row">
+                                        <!-- Step Images Section -->
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label class="fw-bold">Step Images</label>
+
+                                                <!-- Input Type Toggle -->
+                                                <select class="form-select step-input-type mb-2" data-step="@i">
+                                                    <option value="file">Upload File</option>
+                                                    <option value="paste">Paste Image</option>
+                                                </select>
+
+                                                <!-- File Upload Mode -->
+                                                <div class="step-file-input step-mode" data-mode="file" data-step="@i">
+                                                    <input type="file" asp-for="@Model.Steps[i].StepImages" multiple class="form-control-file" />
+                                                    <div class="form-text">
+                                                        <i class="fas fa-upload me-1"></i>Select one or multiple images
+                                                    </div>
+                                                </div>
+
+                                                <!-- Paste Mode -->
+                                                <div class="step-rich-text step-mode d-none" data-mode="paste" data-step="@i">
+                                                    <div class="rich-text-editor form-control form-control-sm step-image-editor"
+                                                         contenteditable="true"
+                                                         data-target="Steps[@i].StepImagesPaste"
+                                                         placeholder="Paste image here (Ctrl+V)...">
+                                                    </div>
+                                                    <textarea name="Steps[@i].StepImagesPaste" class="d-none rich-text-area"></textarea>
+                                                    <div class="form-text">
+                                                        <i class="fas fa-mouse-pointer me-1"></i>Use Ctrl+V to paste screenshots
+                                                    </div>
+                                                </div>
+
+                                                <span asp-validation-for="@Model.Steps[i].StepImages" class="text-danger"></span>
+
+                                                <!-- Existing Step Images -->
+                                                @if (!string.IsNullOrEmpty(Model.Steps[i].ExistingImagePath))
+                                                {
+                                                    <div class="existing-images mt-3">
+                                                        <p class="small fw-semibold text-primary mb-2">
+                                                            <i class="fas fa-images me-1"></i>Existing Step Images:
+                                                        </p>
+                                                        <div class="d-flex flex-wrap gap-2">
+                                                            @foreach (var img in Model.Steps[i].ExistingImagePath.Split(','))
+                                                            {
+                                                                if (!string.IsNullOrWhiteSpace(img))
+                                                                {
+                                                                    <div class="position-relative image-preview-container">
+                                                                        <img src="@img" class="img-thumbnail" style="max-height: 100px; max-width: 150px;" />
+                                                                        <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 delete-image-btn"
+                                                                                style="transform: translate(30%, -30%); width: 24px; height: 24px; border-radius: 50%; padding: 0;"
+                                                                                data-img-path="@img" data-image-type="step" data-step-index="@i">
+                                                                            <i class="fas fa-times" style="font-size: 12px;"></i>
+                                                                        </button>
+                                                                        <div class="text-center mt-1">
+                                                                            <small class="text-muted">Step Image</small>
+                                                                        </div>
+                                                                    </div>
+                                                                }
+                                                            }
+                                                        </div>
+                                                        <input type="hidden" asp-for="@Model.Steps[i].DeletedImages" class="deleted-images" />
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+
+                                        <!-- Key Point Image Section -->
+                                        <div class="col-md-6">
+                                            <div class="form-group">
+                                                <label class="fw-bold">Key Point Image (Optional)</label>
+
+                                                <!-- Input Type Toggle -->
+                                                <select class="form-select keypoint-input-type mb-2" data-step="@i">
+                                                    <option value="file">Upload File</option>
+                                                    <option value="paste">Paste Image</option>
+                                                </select>
+
+                                                <!-- File Upload Mode -->
+                                                <div class="keypoint-file-input keypoint-mode" data-mode="file" data-step="@i">
+                                                    <input type="file" asp-for="@Model.Steps[i].KeyPointImage" class="form-control-file" />
+                                                </div>
+
+                                                <!-- Paste Mode -->
+                                                <div class="keypoint-rich-text keypoint-mode d-none" data-mode="paste" data-step="@i">
+                                                    <div class="rich-text-editor form-control form-control-sm keypoint-image-editor"
+                                                         contenteditable="true"
+                                                         data-target="Steps[@i].KeyPointImagePaste"
+                                                         placeholder="Paste image here (Ctrl+V)...">
+                                                    </div>
+                                                    <textarea name="Steps[@i].KeyPointImagePaste" class="d-none rich-text-area"></textarea>
+                                                </div>
+
+                                                <span asp-validation-for="@Model.Steps[i].KeyPointImage" class="text-danger"></span>
+
+                                                <!-- Existing Key Point Image -->
+                                                @if (!string.IsNullOrEmpty(Model.Steps[i].ExistingKeyPointImagePath))
+                                                {
+                                                    <div class="existing-image mt-3">
+                                                        <p class="small fw-semibold text-primary mb-2">
+                                                            <i class="fas fa-image me-1"></i>Existing Key Point Image:
+                                                        </p>
+                                                        <div class="position-relative d-inline-block image-preview-container">
+                                                            <img src="@Model.Steps[i].ExistingKeyPointImagePath" class="img-thumbnail" style="max-height: 100px; max-width: 150px;" />
+                                                            <button type="button" class="btn btn-sm btn-danger position-absolute top-0 end-0 delete-image-btn"
+                                                                    style="transform: translate(30%, -30%); width: 24px; height: 24px; border-radius: 50%; padding: 0;"
+                                                                    data-img-path="@Model.Steps[i].ExistingKeyPointImagePath" data-image-type="keypoint" data-step-index="@i">
+                                                                <i class="fas fa-times" style="font-size: 12px;"></i>
+                                                            </button>
+                                                            <div class="text-center mt-1">
+                                                                <small class="text-muted">Key Point Image</small>
+                                                            </div>
+                                                        </div>
+                                                            <input type="hidden"name="Steps[@i].DeletedKeyPointImage"class="deleted-keypoint-image" value="@Model.Steps[i].DeletedKeyPointImage?.ToString().ToLower()" />
+
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                            }
+                        }
+                        else
+                        {
+                        <p class="text-muted">No steps added yet.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+}
+else
+{
+    <div class="alert alert-info text-center py-5 shadow-sm rounded-4">
+        <i class="fas fa-user-shield fa-3x mb-3 text-primary"></i>
+        <h4 class="fw-bold text-dark">Authentication Required</h4>
+        <p class="text-secondary mb-4">
+            You must be an <strong>Administrator</strong>, <strong>Manager</strong>, or <strong>Technician</strong> to access this page.
+        </p>
+        <a href="/Account/Login" class="btn btn-outline-primary px-4">
+            <i class="fas fa-sign-in-alt me-2"></i> Go to Login
+        </a>
+    </div>
+
+}
+
+@section Scripts {
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+
+   @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+
+    <script>
+               // Template for new step with enhanced image functionality
+        const newStepTemplate = (index, stepNumber) => `
+                <div class="step-card card mb-3" data-step-id="0" data-step-index="${index}">
+                    <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                        <div class="step-handle" style="cursor: grab;">
+                            <i class="fas fa-arrows-alt me-2 text-muted"></i>
+                            <h6 class="mb-0 d-inline">Step <span class="step-number-display">${stepNumber}</span></h6>
+                        </div>
+                        <div>
+                            <button type="button" class="btn btn-sm btn-outline-primary add-step-between me-1" title="Add Step After">
+                                <i class="fas fa-plus"></i>Add Step below
+                            </button>
+                            <button type="button" class="btn btn-sm btn-danger remove-step">
+                                <i class="fas fa-trash-alt me-1"></i> Remove
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <input type="hidden" name="Steps[${index}].Id" value="0" class="fw-bold" />
+                        <input type="hidden" name="Steps[${index}].StepNumber" value="${stepNumber}" class="step-number-input" />
+
+                    <!-- Instructions with Rich Text Editor -->
+                    <div class="form-group mb-3">
+                        <label class="fw-bold">Instructions</label>
+                        <div class="rich-text-toolbar mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="bold" title="Bold">
+                                <i class="fas fa-bold"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="italic" title="Italic">
+                                <i class="fas fa-italic"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="underline" title="Underline">
+                                <i class="fas fa-underline"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="insertUnorderedList" title="Bullet List">
+                                <i class="fas fa-list-ul"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="insertOrderedList" title="Numbered List">
+                                <i class="fas fa-list-ol"></i>
+                            </button>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" title="Text Color">
+                                    <i class="fas fa-palette"></i>
+                                </button>
+                                <div class="dropdown-menu p-2 color-palette">
+                                    <div class="d-flex flex-wrap" style="width: 150px;">
+                                        <button type="button" class="color-btn m-1" data-color="#dc3545" style="background-color: #dc3545; width: 20px; height: 20px; border: 1px solid #ccc;" title="Red"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#fd7e14" style="background-color: #fd7e14; width: 20px; height: 20px; border: 1px solid #ccc;" title="Orange"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#ffc107" style="background-color: #ffc107; width: 20px; height: 20px; border: 1px solid #ccc;" title="Yellow"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#198754" style="background-color: #198754; width: 20px; height: 20px; border: 1px solid #ccc;" title="Green"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#0dcaf0" style="background-color: #0dcaf0; width: 20px; height: 20px; border: 1px solid #ccc;" title="Cyan"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#0d6efd" style="background-color: #0d6efd; width: 20px; height: 20px; border: 1px solid #ccc;" title="Blue"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#6f42c1" style="background-color: #6f42c1; width: 20px; height: 20px; border: 1px solid #ccc;" title="Purple"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#000000" style="background-color: #000000; width: 20px; height: 20px; border: 1px solid #ccc;" title="Black"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#6c757d" style="background-color: #6c757d; width: 20px; height: 20px; border: 1px solid #ccc;" title="Gray"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#ffffff" style="background-color: #ffffff; width: 20px; height: 20px; border: 1px solid #ccc;" title="White"></button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger mt-2 w-100 remove-color-btn" title="Remove Color">
+                                            <i class="fas fa-eraser me-1"></i> Remove Color
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="rich-text-editor form-control"
+                             contenteditable="true"
+                             data-target="Steps[${index}].Instructions"
+                             placeholder="Describe what to do in this step..."></div>
+                        <textarea name="Steps[${index}].Instructions" class="d-none rich-text-area"></textarea>
+                        <span class="text-danger field-validation-valid" data-valmsg-for="Steps[${index}].Instructions" data-valmsg-replace="true"></span>
+                    </div>
+
+                    <!-- Key Points with Rich Text Editor (Optional) -->
+                    <div class="form-group mb-3">
+                        <label class="fw-bold">Key Points (Optional)</label>
+                        <div class="rich-text-toolbar mb-2">
+                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="bold" title="Bold">
+                                <i class="fas fa-bold"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="italic" title="Italic">
+                                <i class="fas fa-italic"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="underline" title="Underline">
+                                <i class="fas fa-underline"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="insertUnorderedList" title="Bullet List">
+                                <i class="fas fa-list-ul"></i>
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-secondary format-btn" data-command="insertOrderedList" title="Numbered List">
+                                <i class="fas fa-list-ol"></i>
+                            </button>
+                            <div class="btn-group">
+                                <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" title="Text Color">
+                                    <i class="fas fa-palette"></i>
+                                </button>
+                                <div class="dropdown-menu p-2 color-palette">
+                                    <div class="d-flex flex-wrap" style="width: 150px;">
+                                        <button type="button" class="color-btn m-1" data-color="#dc3545" style="background-color: #dc3545; width: 20px; height: 20px; border: 1px solid #ccc;" title="Red"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#fd7e14" style="background-color: #fd7e14; width: 20px; height: 20px; border: 1px solid #ccc;" title="Orange"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#ffc107" style="background-color: #ffc107; width: 20px; height: 20px; border: 1px solid #ccc;" title="Yellow"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#198754" style="background-color: #198754; width: 20px; height: 20px; border: 1px solid #ccc;" title="Green"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#0dcaf0" style="background-color: #0dcaf0; width: 20px; height: 20px; border: 1px solid #ccc;" title="Cyan"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#0d6efd" style="background-color: #0d6efd; width: 20px; height: 20px; border: 1px solid #ccc;" title="Blue"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#6f42c1" style="background-color: #6f42c1; width: 20px; height: 20px; border: 1px solid #ccc;" title="Purple"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#000000" style="background-color: #000000; width: 20px; height: 20px; border: 1px solid #ccc;" title="Black"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#6c757d" style="background-color: #6c757d; width: 20px; height: 20px; border: 1px solid #ccc;" title="Gray"></button>
+                                        <button type="button" class="color-btn m-1" data-color="#ffffff" style="background-color: #ffffff; width: 20px; height: 20px; border: 1px solid #ccc;" title="White"></button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger mt-2 w-100 remove-color-btn" title="Remove Color">
+                                            <i class="fas fa-eraser me-1"></i> Remove Color
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="rich-text-editor form-control"
+                             contenteditable="true"
+                             data-target="Steps[${index}].KeyPoints"
+                             placeholder="Highlight important notes or tips (optional)..."></div>
+                        <textarea name="Steps[${index}].KeyPoints" class="d-none rich-text-area"></textarea>
+                        <span class="text-danger field-validation-valid" data-valmsg-for="Steps[${index}].KeyPoints" data-valmsg-replace="true"></span>
+                    </div>
+
+                    <div class="row">
+                        <!-- Step Images Section -->
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="fw-bold">Step Images</label>
+
+                                <!-- Input Type Toggle -->
+                                <select class="form-select step-input-type mb-2" data-step="${index}">
+                                    <option value="file">Upload File</option>
+                                    <option value="paste">Paste Image</option>
+                                </select>
+
+                                <!-- File Upload Mode -->
+                                <div class="step-file-input step-mode" data-mode="file" data-step="${index}">
+                                    <input type="file" name="Steps[${index}].StepImages" multiple class="form-control-file" />
+                                    <div class="form-text">
+                                        <i class="fas fa-upload me-1"></i>Select one or multiple images
+                                    </div>
+                                </div>
+
+                                <!-- Paste Mode -->
+                                <div class="step-rich-text step-mode d-none" data-mode="paste" data-step="${index}">
+                                    <div class="rich-text-editor form-control form-control-sm step-image-editor"
+                                         contenteditable="true"
+                                         data-target="Steps[${index}].StepImagesPaste"
+                                         placeholder="Paste image here (Ctrl+V)..."></div>
+                                    <textarea name="Steps[${index}].StepImagesPaste" class="d-none rich-text-area"></textarea>
+                                    <div class="form-text">
+                                        <i class="fas fa-mouse-pointer me-1"></i>Use Ctrl+V to paste screenshots
+                                    </div>
+                                </div>
+
+                                <span class="text-danger field-validation-valid" data-valmsg-for="Steps[${index}].StepImages" data-valmsg-replace="true"></span>
+                                <div class="existing-images mt-2 d-none">
+                                    <input type="hidden" name="Steps[${index}].DeletedImages" class="deleted-images" value="" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Key Point Image Section -->
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="fw-bold">Key Point Image (Optional)</label>
+
+                                <!-- Input Type Toggle -->
+                                <select class="form-select keypoint-input-type mb-2" data-step="${index}">
+                                    <option value="file">Upload File</option>
+                                    <option value="paste">Paste Image</option>
+                                </select>
+
+                                <!-- File Upload Mode -->
+                                <div class="keypoint-file-input keypoint-mode" data-mode="file" data-step="${index}">
+                                    <input type="file" name="Steps[${index}].KeyPointImage" class="form-control-file" />
+                                </div>
+
+                                <!-- Paste Mode -->
+                                <div class="keypoint-rich-text keypoint-mode d-none" data-mode="paste" data-step="${index}">
+                                    <div class="rich-text-editor form-control form-control-sm keypoint-image-editor"
+                                         contenteditable="true"
+                                         data-target="Steps[${index}].KeyPointImagePaste"
+                                         placeholder="Paste image here (Ctrl+V)..."></div>
+                                    <textarea name="Steps[${index}].KeyPointImagePaste" class="d-none rich-text-area"></textarea>
+                                </div>
+
+                                <span class="text-danger field-validation-valid" data-valmsg-for="Steps[${index}].KeyPointImage" data-valmsg-replace="true"></span>
+                                <div class="existing-image mt-2 d-none">
+                                    <input type="hidden" name="Steps[${index}].DeletedKeyPointImage" class="deleted-keypoint-image" value="false" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+                // Enhanced renumbering function that properly updates all step numbers
+        function renumberSteps() {
+            const stepCards = $('.step-card');
+
+            stepCards.each(function(index) {
+                const stepNumber = index + 1;
+                const $card = $(this);
+
+                // Update visible step number display
+                $card.find('.step-number-display').text(stepNumber);
+
+                // Update the hidden input value - THIS IS CRITICAL FOR SAVING
+                $card.find('.step-number-input').val(stepNumber);
+
+                // Update the card header text
+                $card.find('h6').html(`Step <span class="step-number-display">${stepNumber}</span>`);
+
+                // Update data-index for drag and drop
+                $card.attr('data-index', index);
+
+                // Update all array indices in names and data attributes
+                updateStepFieldIndexes($card, index);
+            });
+
+            stepCounter = stepCards.length + 1;
+
+            // Reinitialize drag and drop after renumbering
+            initDragAndDrop();
+        }
+
+        // Function to update all field names with new array indices
+        function updateStepFieldIndexes($card, newIndex) {
+            // Update all input names
+            $card.find('[name]').each(function() {
+                const $el = $(this);
+                const name = $el.attr('name');
+                if (name && name.includes('Steps[')) {
+                    const newName = name.replace(/Steps\[\d+\]/, `Steps[${newIndex}]`);
+                    $el.attr('name', newName);
+
+                    // Also update the ID if it exists
+                    const id = $el.attr('id');
+                    if (id && id.includes('Steps_')) {
+                        const newId = id.replace(/Steps_\d+__/, `Steps_${newIndex}__`);
+                        $el.attr('id', newId);
+                    }
+                }
+            });
+
+            // Update data-target attributes
+            $card.find('[data-target]').each(function() {
+                const $el = $(this);
+                const target = $el.attr('data-target');
+                if (target && target.includes('Steps[')) {
+                    $el.attr('data-target', target.replace(/Steps\[\d+\]/, `Steps[${newIndex}]`));
+                }
+            });
+
+            // Update data-step attributes
+            $card.find('[data-step]').each(function() {
+                $(this).attr('data-step', newIndex);
+            });
+
+            // Update validation attributes
+            $card.find('[data-valmsg-for]').each(function() {
+                const $el = $(this);
+                const valmsgFor = $el.attr('data-valmsg-for');
+                if (valmsgFor && valmsgFor.includes('Steps[')) {
+                    $el.attr('data-valmsg-for', valmsgFor.replace(/Steps\[\d+\]/, `Steps[${newIndex}]`));
+                }
+            });
+
+            // Update for attributes in labels
+            $card.find('label[for]').each(function() {
+                const $el = $(this);
+                const forAttr = $el.attr('for');
+                if (forAttr && forAttr.includes('Steps_')) {
+                    $el.attr('for', forAttr.replace(/Steps_\d+__/, `Steps_${newIndex}__`));
+                }
+            });
+        }
+        
+        // Enhanced Rich Text Editor Initialization
+        function initRichTextEditors(context = document) {
+            const editors = (context || document).querySelectorAll('.rich-text-editor');
+
+            editors.forEach(editor => {
+                const target = editor.closest('.form-group').querySelector('.rich-text-area');
+
+                // Set initial content
+                if (target && target.value) {
+                    editor.innerHTML = target.value;
+                }
+
+                // Sync editor content to hidden textarea
+                editor.addEventListener('input', function() {
+                    if (target) {
+                        target.value = editor.innerHTML;
+                    }
+                });
+
+                // Handle paste events for images
+                editor.addEventListener('paste', function(e) {
+                    const clipboard = e.clipboardData;
+                    if (!clipboard) return;
+
+                    const items = Array.from(clipboard.items);
+                    const imageItems = items.filter(item => item.type.startsWith('image'));
+
+                    if (imageItems.length > 0) {
+                        e.preventDefault();
+                        processPastedImages(imageItems, editor);
+                    }
+                });
+
+                // Focus styles
+                editor.addEventListener('focus', function() {
+                    this.classList.add('editor-focused');
+                });
+
+                editor.addEventListener('blur', function() {
+                    this.classList.remove('editor-focused');
+                });
+            });
+
+            // Initialize all toolbar components
+            initFormatButtons(context);
+            initColorButtons(context);
+        }
+
+        // Process pasted images
+        function processPastedImages(imageItems, editor) {
+            imageItems.forEach(item => {
+                const file = item.getAsFile();
+                if (!file) return;
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const base64Data = e.target.result;
+                    insertImageIntoEditor(base64Data, editor);
+                    syncEditorContent(editor);
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Insert image into editor
+        function insertImageIntoEditor(base64Data, editor) {
+            const img = document.createElement('img');
+            img.src = base64Data;
+            img.className = 'pasted-image img-fluid mt-2';
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            img.style.border = '1px solid #dee2e6';
+            img.style.borderRadius = '4px';
+            img.style.padding = '4px';
+
+            const selection = window.getSelection();
+            if (selection?.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                range.deleteContents();
+                range.insertNode(img);
+                range.insertNode(document.createElement('br'));
+            } else {
+                editor.appendChild(img);
+                editor.appendChild(document.createElement('br'));
+            }
+        }
+
+        // Sync editor content
+        function syncEditorContent(editor) {
+            const target = editor.closest('.form-group').querySelector('.rich-text-area');
+            if (target) {
+                target.value = editor.innerHTML;
+            }
+        }
+
+        // Format buttons initialization
+        function initFormatButtons(context) {
+            const formatButtons = (context || document).querySelectorAll('.format-btn');
+            formatButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const command = this.getAttribute('data-command');
+                    const editor = this.closest('.form-group').querySelector('.rich-text-editor');
+                    if (editor) {
+                        document.execCommand(command, false, null);
+                        editor.focus();
+                        syncEditorContent(editor);
+                    }
+                });
+            });
+        }
+
+        // Color buttons initialization
+        function initColorButtons(context) {
+            // Color application
+            const colorButtons = (context || document).querySelectorAll('.color-btn');
+            colorButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const color = this.getAttribute('data-color');
+                    const editor = this.closest('.form-group').querySelector('.rich-text-editor');
+                    if (editor) {
+                        document.execCommand('styleWithCSS', false, true);
+                        document.execCommand('foreColor', false, color);
+                        editor.focus();
+                        syncEditorContent(editor);
+                    }
+                });
+            });
+
+            // Color removal
+            const removeColorButtons = (context || document).querySelectorAll('.remove-color-btn');
+            removeColorButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const editor = this.closest('.form-group').querySelector('.rich-text-editor');
+                    if (editor) {
+                        document.execCommand('styleWithCSS', false, true);
+                        document.execCommand('foreColor', false, 'inherit');
+                        editor.focus();
+                        syncEditorContent(editor);
+                    }
+                });
+            });
+        }
+
+        // Initialize input type toggles
+        function initInputTypeToggles(context = document) {
+            const toggles = (context || document).querySelectorAll('.step-input-type, .keypoint-input-type');
+            toggles.forEach(toggle => {
+                toggle.addEventListener('change', handleInputTypeToggle);
+                // Trigger initial state
+                handleInputTypeToggle({ target: toggle });
+            });
+        }
+
+        // Handle input type toggle
+        function handleInputTypeToggle(e) {
+            const select = e.target;
+            const step = select.getAttribute('data-step');
+            const mode = select.value;
+            const isStep = select.classList.contains('step-input-type');
+            const prefix = isStep ? 'step' : 'keypoint';
+
+            // Hide all modes
+            const allModes = select.closest('.form-group').querySelectorAll(`.${prefix}-mode`);
+            allModes.forEach(el => el.classList.add('d-none'));
+
+            // Show selected mode
+            const selectedMode = select.closest('.form-group').querySelector(`.${prefix}-mode[data-mode="${mode}"]`);
+            if (selectedMode) {
+                selectedMode.classList.remove('d-none');
+
+                // Initialize rich text editor for paste mode
+                if (mode === 'paste') {
+                    const editor = selectedMode.querySelector('.rich-text-editor');
+                    if (editor) {
+                        initRichTextEditors(selectedMode);
+                    }
+                }
+            }
+        }
+
+        // Handle image deletion
+        function initImageDeletion() {
+            document.addEventListener('click', function(e) {
+                if (e.target.closest('.delete-image-btn')) {
+                    const button = e.target.closest('.delete-image-btn');
+                    const imgPath = button.getAttribute('data-img-path');
+                    const imageType = button.getAttribute('data-image-type');
+                    const stepIndex = button.getAttribute('data-step-index');
+
+                    if (confirm('Are you sure you want to delete this image?')) {
+                        const container = button.closest('.image-preview-container');
+
+                        if (imageType === 'step') {
+                            const deletedImagesInput = container.closest('.existing-images').querySelector('.deleted-images');
+                            let deletedImages = deletedImagesInput.value ? deletedImagesInput.value.split(',') : [];
+                            deletedImages.push(imgPath);
+                            deletedImagesInput.value = deletedImages.join(',');
+                        } else if (imageType === 'keypoint') {
+                            const deletedInput = container.closest('.existing-image').querySelector('.deleted-keypoint-image');
+                            deletedInput.value = 'true';
+                        }
+
+                        // Remove the image preview
+                        container.remove();
+                    }
+                }
+            });
+        }
+
+        // Process all editors before submission
+        function processAllEditorsBeforeSubmit() {
+            const editors = document.querySelectorAll('.rich-text-editor');
+            editors.forEach(editor => {
+                syncEditorContent(editor);
+            });
+        }
+
+        // Drag and Drop functionality
+        function initDragAndDrop() {
+            const container = document.getElementById('steps-container');
+
+            let draggedItem = null;
+            let dragStartIndex = null;
+
+            // Make steps draggable
+            container.querySelectorAll('.step-card').forEach((step, index) => {
+                step.setAttribute('draggable', 'true');
+                step.setAttribute('data-index', index);
+
+                step.addEventListener('dragstart', handleDragStart);
+                step.addEventListener('dragover', handleDragOver);
+                step.addEventListener('dragenter', handleDragEnter);
+                step.addEventListener('dragleave', handleDragLeave);
+                step.addEventListener('drop', handleDrop);
+                step.addEventListener('dragend', handleDragEnd);
+            });
+
+            function handleDragStart(e) {
+                draggedItem = this;
+                dragStartIndex = parseInt(this.getAttribute('data-index'));
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', this.innerHTML);
+
+                // Add visual feedback
+                this.classList.add('dragging');
+                setTimeout(() => this.style.display = 'none', 0);
+            }
+
+            function handleDragOver(e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                return false;
+            }
+
+            function handleDragEnter(e) {
+                this.classList.add('drag-over');
+            }
+
+            function handleDragLeave(e) {
+                this.classList.remove('drag-over');
+            }
+
+            function handleDrop(e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (draggedItem !== this) {
+                    const dropIndex = parseInt(this.getAttribute('data-index'));
+                    const container = this.parentNode;
+
+                    // Remove from current position
+                    container.removeChild(draggedItem);
+
+                    // Insert at new position
+                    if (dragStartIndex < dropIndex) {
+                        container.insertBefore(draggedItem, this.nextSibling);
+                    } else {
+                        container.insertBefore(draggedItem, this);
+                    }
+
+                    // IMMEDIATELY renumber all steps
+                    renumberSteps();
+                }
+
+                this.classList.remove('drag-over');
+                return false;
+            }
+
+            function handleDragEnd(e) {
+                this.classList.remove('dragging');
+                this.style.display = '';
+                container.querySelectorAll('.step-card').forEach(step => {
+                    step.classList.remove('drag-over');
+                });
+
+                // Final renumbering to ensure everything is correct
+                renumberSteps();
+            }
+        }
+
+        // Add step at specific position
+        function addStepAtPosition(position) {
+            const stepCards = $('#steps-container .step-card');
+            const newIndex = stepCards.length;
+            const newStepNumber = position + 1;
+
+            // Create new step
+            const newStepHtml = newStepTemplate(newIndex, newStepNumber);
+            const $newStep = $(newStepHtml);
+
+            // Insert at position
+            if (position < stepCards.length) {
+                $(stepCards[position]).before($newStep);
+            } else {
+                $('#steps-container').append($newStep);
+            }
+
+            // Initialize the new step
+            initRichTextEditors($newStep[0]);
+            initInputTypeToggles($newStep[0]);
+
+            // Reinitialize drag and drop
+            initDragAndDrop();
+            renumberSteps();
+
+            // Reinitialize validation
+            $.validator.unobtrusive.parse($newStep);
+        }
+
+        $(document).ready(function() {
+            // Initialize Select2 for areas
+            $('.select2').select2({
+                placeholder: "Select areas",
+                allowClear: true,
+                width: '100%'
+            });
+
+            // Initialize effective date if it exists
+            const effectiveDateVal = $('#EffectiveDate').val();
+            if (effectiveDateVal) {
+                const effectiveDate = new Date(effectiveDateVal);
+                const now = new Date();
+                const diffYears = effectiveDate.getFullYear() - now.getFullYear();
+
+                if (diffYears >= 1 && diffYears <= 7) {
+                    $(`#yearOption${diffYears}`).prop('checked', true);
+                    document.getElementById("EffectiveDateDisplay").value =
+                        effectiveDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+                }
+            }
+
+            // Initialize all functionality
+            initRichTextEditors();
+            initInputTypeToggles();
+            initImageDeletion();
+            initDragAndDrop();
+
+            // Handle image deletion for existing images
+            $(document).on('click', '.existing-images button, .existing-image button', function() {
+                const imgPath = $(this).data('img-path');
+                const container = $(this).closest('.existing-images, .existing-image');
+
+                // Mark image as deleted
+                if (container.hasClass('existing-images')) {
+                    const deletedImagesInput = container.find('.deleted-images');
+                    let deletedImages = deletedImagesInput.val() ? deletedImagesInput.val().split(',') : [];
+                    deletedImages.push(imgPath);
+                    deletedImagesInput.val(deletedImages.join(','));
+                } else {
+                    container.find('.deleted-keypoint-image').val('true');
+                }
+
+                // Remove image preview
+                $(this).closest('div.position-relative').remove();
+            });
+
+            // Add new step at the end
+            let stepCounter = @(Model.Steps.Count > 0 ? Model.Steps.Max(s => s.StepNumber) + 1 : 1);
+
+            $('#add-step').on('click', function() {
+                addStepAtPosition($('#steps-container .step-card').length);
+                stepCounter++;
+            });
+
+            // Add step between existing steps
+            $('#steps-container').on('click', '.add-step-between', function() {
+                const $stepCard = $(this).closest('.step-card');
+                const position = $('#steps-container .step-card').index($stepCard) + 1;
+                addStepAtPosition(position);
+                stepCounter++;
+            });
+
+            // Remove step
+            $('#steps-container').on('click', '.remove-step', function() {
+                $(this).closest('.step-card').remove();
+                renumberSteps();
+            });
+
+            // Renumber steps when order changes
+            function renumberSteps() {
+                $('.step-card').each(function(index) {
+                    const stepNumber = index + 1;
+                    const $card = $(this);
+
+                    // Update visible number
+                    $card.find('h6').text(`Step ${stepNumber}`);
+
+                    // Update hidden field
+                    $card.find('.step-number').val(stepNumber);
+
+                    // Update data-index for drag and drop
+                    $card.attr('data-index', index);
+
+                    // Update all names and data attributes
+                    $card.find('[name]').each(function() {
+                        const name = $(this).attr('name');
+                        if (name && name.includes('Steps[')) {
+                            $(this).attr('name', name.replace(/Steps\[\d+\]/, `Steps[${index}]`));
+                        }
+                    });
+
+                    // Update data-target attributes
+                    $card.find('[data-target]').each(function() {
+                        const target = $(this).attr('data-target');
+                        if (target && target.includes('Steps[')) {
+                            $(this).attr('data-target', target.replace(/Steps\[\d+\]/, `Steps[${index}]`));
+                        }
+                    });
+
+                    // Update data-step attributes
+                    $card.find('[data-step]').each(function() {
+                        $(this).attr('data-step', index);
+                    });
+                });
+
+                stepCounter = $('.step-card').length + 1;
+
+                // Reinitialize drag and drop after renumbering
+                initDragAndDrop();
+            }
+        });
+
+        function setEffectiveDate() {
+            const selectedYears = document.querySelector('input[name="yearOption"]:checked');
+            if (selectedYears) {
+                const years = parseInt(selectedYears.value, 10);
+                const now = new Date();
+                const effectiveUntil = new Date(now.setFullYear(now.getFullYear() + years));
+
+                // Format date as yyyy-MM-dd for hidden input
+                const yyyy = effectiveUntil.getFullYear();
+                const mm = String(effectiveUntil.getMonth() + 1).padStart(2, '0');
+                const dd = String(effectiveUntil.getDate()).padStart(2, '0');
+
+                document.getElementById("EffectiveDate").value = `${yyyy}-${mm}-${dd}`;
+                document.getElementById("EffectiveDateDisplay").value = effectiveUntil.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+            }
+        }
+
+        // Ensure all rich text editor content is synced before form submission
+        $('form').on('submit', function (e) {
+            // Sync all rich text editors with their hidden textareas using the enhanced function
+            processAllEditorsBeforeSubmit();
+
+            // Validate required fields
+            let isValid = true;
+            const hasInstruction = $('#steps-container textarea[name*="Instructions"]')
+                .toArray()
+                .some(t => $(t).val().trim() !== '');
+
+            if (!hasInstruction) {
+                e.preventDefault();
+                alert("Please provide at least one step with instructions.");
+                isValid = false;
+            }
+
+            // Validate effective date
+            const effectiveDate = document.getElementById("EffectiveDate").value;
+            if (!effectiveDate) {
+                e.preventDefault();
+                alert("Please select an effective period.");
+                isValid = false;
+            }
+
+            return isValid;
+        });
+    </script>
+
+
+}
+
+@section Styles {
+    
+    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    
+    <style>
+        /* Rich Text Editor Styles */
+
+        body {
+            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding-top: 20px;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            border: none;
+        }
+
+        .card-header {
+            background-color: #f1f3f5;
+            border-bottom: none;
+            font-weight: 600;
+            padding: 15px 20px;
+            border-radius: 10px 10px 0 0 !important;
+        }
+
+        .solution-card {
+            border-left: 4px solid #6c5ce7;
+        }
+
+        .error-card {
+            border-left: 4px solid #e74c3c;
+        }
+
+        .code-block {
+            background-color: #2d2d2d;
+            color: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            font-family: 'Consolas', monospace;
+            overflow-x: auto;
+            margin: 15px 0;
+        }
+
+        .btn-primary {
+            background-color: #6c5ce7;
+            border: none;
+        }
+
+            .btn-primary:hover {
+                background-color: #5649c0;
+            }
+
+        .tag {
+            display: inline-block;
+            background-color: #e74c3c;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+
+        .solution-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background-color: #6c5ce7;
+            color: white;
+            text-align: center;
+            line-height: 30px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .recommended {
+            background-color: #4CAF50;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+
+        .rich-text-editor {
+            min-height: 120px;
+            max-height: 400px;
+            overflow-y: auto;
+            border-radius: 0 0 0.375rem 0.375rem;
+            transition: all 0.15s ease-in-out;
+            border: 1px solid #ced4da;
+            padding: 0.375rem 0.75rem;
+        }
+
+            .rich-text-editor:focus,
+            .rich-text-editor.editor-focused {
+                border-color: #86b7fe;
+                outline: 0;
+                box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+            }
+
+        .rich-text-toolbar {
+            background-color: #f8f9fa;
+            border: 1px solid #ced4da;
+            border-bottom: none;
+            border-radius: 0.375rem 0.375rem 0 0;
+            padding: 0.5rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+        }
+
+        .pasted-image {
+            max-width: 100%;
+            height: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+            padding: 4px;
+            background: white;
+            margin: 8px 0;
+        }
+
+        .format-btn {
+            padding: 0.25rem 0.5rem;
+        }
+
+        .color-palette {
+            min-width: 180px;
+        }
+
+        .color-btn {
+            border-radius: 3px;
+            padding: 0;
+            width: 20px;
+            height: 20px;
+        }
+
+        .remove-color-btn {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.4rem;
+        }
+
+        .d-none {
+            display: none !important;
+        }
+
+        .color-palette {
+            min-width: auto;
+        }
+
+        .color-btn {
+            border-radius: 3px;
+            padding: 0;
+        }
+
+        .remove-color-btn {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.4rem;
+        }
+        
+        .step-card {
+            transition: all 0.3s ease;
+        }
+        
+        .step-card:hover {
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+        }
+        
+        .btn-group .btn-outline-primary:not(:last-child) {
+            border-right: none;
+        }
+        
+        .select2-container--default .select2-selection--multiple {
+            min-height: 38px;
+            border: 1px solid #ced4da;
+        }
+
+        /* Drag and Drop Styles */
+        .step-card.dragging {
+            opacity: 0.5;
+            border: 2px dashed #007bff;
+        }
+
+        .step-card.drag-over {
+            border: 2px dashed #28a745;
+            background-color: #f8f9fa;
+        }
+
+        .step-handle:hover {
+            cursor: grab;
+        }
+
+        .step-handle:active {
+            cursor: grabbing;
+        }
+
+        /* Visual feedback for drag operations */
+        .step-card {
+            transition: all 0.2s ease;
+        }
+
+            .step-card.dragging {
+                transform: rotate(5deg);
+            }
+
+        @@media (max-width: 768px) {
+            .rich-text-toolbar {
+                display: flex;
+                flex-wrap: wrap;
+            }
+
+            .format-btn {
+                margin-bottom: 0.25rem;
+            }
+            
+            .btn-group.w-100 {
+                flex-wrap: wrap;
+            }
+            
+            .btn-group.w-100 .btn {
+                flex: 1 0 33%;
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+
+}
+

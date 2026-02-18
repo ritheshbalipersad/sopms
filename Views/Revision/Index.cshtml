@@ -1,0 +1,285 @@
+﻿@model IEnumerable<SOPMSApp.Models.DocRegister>
+@{
+    ViewData["Title"] = "Document Revision";
+    
+}
+
+@{
+    var departments = ViewBag.Departments as List<string> ?? new List<string>();
+    var selectedDept = ViewBag.SelectedDepartment as string ?? "";
+}
+
+
+<div class="container-fluid pd-5 mb-5">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="text-primary fw-bold border-bottom pb-2">Document Revision</h2>
+        </div>
+    </div>
+
+    @if (User.Identity.IsAuthenticated)
+    {
+           <!-- Search and Filter Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-light py-3">
+                        <h5 class="card-title mb-0">
+                            <i class="fas fa-filter me-2 text-primary"></i>Search & Filter
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <form asp-action="Index" method="post" class="row g-3 align-items-end">
+                            <!-- Search Input -->
+                            <div class="col-md-4">
+                                <label class="form-label fw-semibold small text-muted">Search Documents</label>
+                                <div class="input-group input-group-lg">
+                                    <span class="input-group-text bg-white border-end-0">
+                                        <i class="fas fa-search text-muted"></i>
+                                    </span>
+                                    <input type="text" 
+                                           name="searchTerm" 
+                                           class="form-control border-start-0 shadow-none"
+                                           placeholder="Enter file name or SOP number..."
+                                           value="@ViewBag.SearchTerm" />
+                                </div>
+                            </div>
+
+                            <!-- Department Filter -->
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold small text-muted">Department</label>
+                                <select name="department" class="form-select form-select-lg shadow-sm">
+                                    <option value="">All Departments</option>
+                                    @foreach (var dept in departments)
+                                    {
+                                        var isSelected = selectedDept == dept ? "selected" : null;
+                                        <option value="@dept" selected="@isSelected">@dept</option>
+                                    }
+                                </select>
+                            </div>
+
+                            <!-- Expiry Status Filter -->
+                            <div class="col-md-3">
+                                <label class="form-label fw-semibold small text-muted">Status Filter</label>
+                                <select name="expiryFilter" class="form-select form-select-lg shadow-sm">
+                                    @{
+                                        var expiry = ViewBag.ExpiryFilter as string ?? "";
+                                    }
+                                    <option value="">All Statuses</option>
+                                    <option value="active" selected="@(expiry == "active" ? "selected" : "")">Active</option>
+                                    <option value="expiring" selected="@(expiry == "expiring" ? "selected" : "")">Expiring Soon</option>
+                                    <option value="expired" selected="@(expiry == "expired" ? "selected" : "")">Expired</option>
+                                </select>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="col-md-2">
+                                <div class="d-grid gap-2">
+                                  <a asp-action="Index" class="btn btn-outline-secondary btn-lg">
+                                        <i class="fas fa-redo me-2"></i>Reset
+                                  </a>    
+                                  <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-filter me-2"></i>Apply
+                                  </button>
+                                  
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                 @if (TempData["Success"] != null)
+                {
+                    <div class="alert alert-success alert-dismissible fade show shadow-sm">
+                        <i class="fas fa-check-circle me-2"></i>
+                        <strong>@TempData["Success"]</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+                @if (TempData["Error"] != null)
+                {
+                    <div class="alert alert-danger alert-dismissible fade show shadow-sm">
+                        <i class="fas fa-exclamation-circle me-2"></i>
+                        <strong>@TempData["Error"]</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+                @if (TempData["Warning"] != null)
+                {
+                    <div class="alert alert-warning alert-dismissible fade show shadow-sm">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        <strong>@TempData["Warning"]</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+               
+                @if (ViewBag.Message != null)
+                {
+                    <div class="alert alert-info alert-dismissible fade show shadow-sm">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>@ViewBag.Message</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                }
+            </div>
+        </div>
+
+        @if (Model != null && Model.Any())
+        {
+            <div class="row">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-body p-0">
+                            <div class="table-responsive">
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th class="ps-4">SOP Number</th>
+                                            <th>Original File Name</th>
+                                            <th>Department</th>
+                                            <th>Revision</th>
+                                            <th>Last Review</th>
+                                            <th>Effective Period</th>
+                                           
+                                            <th class="text-end pe-4">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    @foreach (var doc in Model)
+                                    {
+                                        <tr>
+                                            <td class="ps-4 fw-bold">@doc.SopNumber?.Replace(" ", "")</td>
+                                            <td>@doc.OriginalFile</td>
+                                            <td>@doc.Department</td>
+                                            <td class="fw-bold">@doc.Revision</td>
+                                            <td>@doc.LastReviewDate?.ToString("yyyy-MM-dd")</td>
+                                            <td>
+                                                @if (doc.EffectiveDate.HasValue)
+                                                {
+                                                    var daysDiff = (doc.EffectiveDate.Value - DateTime.Today).Days;
+                                                    string message;
+                                                    string cssClass = "fw-bold";
+
+                                                    if (daysDiff > 0 && daysDiff <= 30)
+                                                    {
+                                                        cssClass += " text-warning";
+                                                        message = $"Expires in {daysDiff} day{(daysDiff != 1 ? "s" : "")}";
+                                                    }
+                                                    else if (daysDiff == 0)
+                                                    {
+                                                        cssClass += " text-danger";
+                                                        message = "Expires today";
+                                                    }
+                                                    else if (daysDiff < 0)
+                                                    {
+                                                        cssClass += " text-danger";
+                                                        var absoluteDays = Math.Abs(daysDiff);
+
+                                                        if (absoluteDays < 30)
+                                                        {
+                                                            message = $"Expired {absoluteDays} day{(absoluteDays != 1 ? "s" : "")} ago";
+                                                        }
+                                                        else if (absoluteDays < 365)
+                                                        {
+                                                            var monthsAgo = (int)Math.Floor(absoluteDays / 30.0);
+                                                            message = $"Expired {monthsAgo} month{(monthsAgo != 1 ? "s" : "")} ago";
+                                                        }
+                                                        else
+                                                        {
+                                                            var yearsAgo = (int)Math.Floor(absoluteDays / 365.0);
+                                                            message = $"Expired {yearsAgo} year{(yearsAgo != 1 ? "s" : "")} ago";
+                                                        }
+                                                    }
+                                                    else
+                                                    {
+                                                        cssClass += " text-success";
+                                                        message = "Active";
+                                                    }
+
+                                                    <span class="@cssClass">@message</span>
+                                                }
+                                                else
+                                                {
+                                                    <span class="text-muted">N/A</span>
+                                                }
+                                            </td>
+
+                                            <td class="text-end pe-4">
+                                                <a asp-action="Edit" asp-route-id="@doc.Id" class="btn btn-sm btn-outline-warning">
+                                                    <i class="fas fa-edit me-1"></i> Revise
+                                                </a>
+                                                 <!-- History Button -->
+                                                 @if (User.IsInRole("Admin"))
+                                                 {
+                                                    <a asp-action="History" asp-route-docRegisterId="@doc.Id" class="btn btn-outline-info btn-sm action-btn" title="View History">
+                                                        <i class="fas fa-history"></i>
+                                                    </a>
+                                                 }
+                                            </td>
+                                        </tr>
+                                    }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div class="row">
+                <div class="col-12">
+                    <div class="card shadow-sm">
+                        <div class="card-body text-center py-5">
+                            <i class="fas fa-file-alt display-4 text-muted mb-3"></i>
+                            <h4 class="text-muted">No documents found</h4>
+                            <p class="text-muted">Try adjusting your search or filter to find what you're looking for.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    }
+</div>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+
+@section Styles {
+    <style>
+        .table thead th {
+            border-top: none;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            color: #6c757d;
+        }
+        
+        .table tbody tr {
+            transition: all 0.2s ease;
+        }
+        
+        .table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .badge {
+            padding: 0.35em 0.65em;
+            font-size: 0.75em;
+            font-weight: 500;
+        }
+
+        .table-hover tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .card {
+            border: 1px solid rgba(0,0,0,.125);
+        }
+    </style>
+}

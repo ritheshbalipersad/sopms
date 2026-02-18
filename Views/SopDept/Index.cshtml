@@ -1,0 +1,350 @@
+﻿@model IEnumerable<DocRegister>
+@using SOPMSApp.Models
+
+@section Styles {
+    <style>
+        .table-container {
+            margin-bottom: 100px;
+        }
+
+        body {
+            padding-bottom: 50px;
+        }
+
+        .preview-options {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .preview-btn {
+            min-width: 80px;
+            font-size: 0.875rem;
+        }
+
+        /* Video Modal */
+        .video-preview-modal .modal-content {
+            background: #000;
+        }
+
+        .video-preview-modal .modal-header {
+            border-bottom: 1px solid #333;
+            background: #000;
+            color: white;
+        }
+
+        .video-preview-modal .btn-close {
+            filter: invert(1);
+        }
+
+        .file-has-multiple::after {
+            content: "📁";
+            margin-left: 5px;
+            font-size: 0.8em;
+        }
+
+        /* File type icons */
+        .table td .fa-file-pdf {
+            color: #dc3545;
+        }
+
+        .table td .fa-file-video {
+            color: #0d6efd;
+        }
+
+        .table td .fa-file-image {
+            color: #198754;
+        }
+
+        .table td .fa-file-word {
+            color: #0dcaf0;
+        }
+
+        .table td .fa-file {
+            color: #6c757d;
+        }
+
+        .table td .fa-folder {
+            color: #ffc107;
+        }
+
+        .table thead th {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            position: sticky;
+            top: 0;
+        }
+
+        .table tbody tr:hover {
+            background-color: #f1f1f1;
+        }
+
+        .sort i {
+            margin-left: 5px;
+        }
+
+        .departments-sidebar {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+    </style>
+}
+
+<div class="container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="text-center my-4">Documents Per Department</h1>
+        @if (User.Identity.IsAuthenticated)
+        {
+            <a asp-controller="Home" asp-action="Index" class="btn btn-outline-primary">
+                <i class="fas fa-tachometer-alt me-2"></i>Home
+            </a>
+        }
+    </div>
+</div>
+
+<div class="departments-sidebar">
+    <div class="departments-dropdown text-center mb-4">
+        <i class="fas fa-building"></i> Select Department
+
+        @{
+            var SelectedDepartment = ViewBag.SelectedDepartment as string;
+            var DepartmentList = ViewBag.DepartmentList as List<string> ?? new List<string>();
+        }
+
+        <div class="dropdown mt-2">
+            <button class="btn btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                @(string.IsNullOrEmpty(SelectedDepartment) ? "Select Department" : SelectedDepartment)
+            </button>
+            <ul class="dropdown-menu">
+                <li>
+                    <a class="dropdown-item @(string.IsNullOrEmpty(SelectedDepartment) ? "active" : "")"
+                       asp-controller="SopDept" asp-action="Index">Clear</a>
+                </li>
+                @foreach (var deptName in DepartmentList)
+                {
+                    <li>
+                        <a class="dropdown-item @(deptName == SelectedDepartment ? "active" : "")"
+                           asp-controller="SopDept" asp-action="Index" asp-route-department="@deptName">
+                            @deptName
+                        </a>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="alert alert-warning text-center">No documents found for this department.</div>
+}
+else
+{
+    <div class="mb-3 pd-5 mb-5">
+        <input type="text" id="searchInput" class="form-control" placeholder="Search documents...">
+    </div>
+
+    <div class="table-container">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th class="sort" data-sort="sopNumber">SOP Number <i class="fas fa-sort"></i></th>
+                    <th class="sort" data-sort="originalFile">Title <i class="fas fa-sort"></i></th>
+                    <th class="sort" data-sort="department">Department <i class="fas fa-sort"></i></th>
+                    <th class="sort" data-sort="area">Area <i class="fas fa-sort"></i></th>
+                    <th class="sort" data-sort="effectiveDate">Effective Date <i class="fas fa-sort"></i></th>
+                    <th class="sort" data-sort="status">Status <i class="fas fa-sort"></i></th>
+                    <th>Preview</th>
+                </tr>
+            </thead>
+            <tbody id="docTableBody">
+                @foreach (var doc in Model)
+                {
+                    var ext = System.IO.Path.GetExtension(doc.OriginalFile)?.ToLowerInvariant();
+                    bool isVideo = new List<string> { ".mp4", ".mov", ".avi", ".mkv", ".webm" }.Contains(ext);
+                    bool isPdf = ext == ".pdf";
+                    bool isImage = new List<string> { ".jpg", ".jpeg", ".png", ".gif", ".bmp" }.Contains(ext);
+                    bool isDoc = new List<string> { ".doc", ".docx", ".txt", ".rtf" }.Contains(ext);
+
+                    bool hasVideo = !string.IsNullOrEmpty(doc.VideoPath);
+                    bool hasPdf = isPdf || (!string.IsNullOrEmpty(doc.FileName) && doc.FileName.ToLower().EndsWith(".pdf"));
+                    bool hasMultiple = hasVideo && hasPdf;
+
+                    string videoFileName = hasVideo ? System.IO.Path.GetFileName(doc.VideoPath) : null;
+                    var videoUrl = hasVideo ? Url.Action("GetVideo", "FileAccess", new { videoPath = videoFileName }) : "#";
+                    var pdfUrl = hasPdf ? Url.Action("GetPdf", "FileAccess", new { fileName = doc.FileName }) : "#";
+
+                    <tr>
+                        <td class="sopNumber">@doc.SopNumber</td>
+                        <td class="originalFile">
+                            <div class="d-flex align-items-center @(hasMultiple ? "file-has-multiple" : "")">
+                                @if (hasMultiple)
+                                {
+                                    <i class="fas fa-folder text-warning me-2" title="Multiple files"></i>
+                                }
+                                else if (isPdf || hasPdf)
+                                {
+                                    <i class="fas fa-file-pdf text-danger me-2"></i>
+                                }
+                                else if (isVideo || hasVideo)
+                                {
+                                    <i class="fas fa-file-video text-primary me-2"></i>
+                                }
+                                else if (isImage)
+                                {
+                                    <i class="fas fa-file-image text-success me-2"></i>
+                                }
+                                else if (isDoc)
+                                {
+                                    <i class="fas fa-file-word text-info me-2"></i>
+                                }
+                                else
+                                {
+                                    <i class="fas fa-file text-secondary me-2"></i>
+                                }
+                                <span>@doc.OriginalFile</span>
+                                @if (hasMultiple)
+                                {
+                                    <small class="text-muted ms-2">(Multiple formats)</small>
+                                }
+                            </div>
+                        </td>
+                        <td class="department">@doc.Department</td>
+                        <td class="area">@doc.Area</td>
+                        <td class="effectiveDate @(doc.EffectiveDate < DateTime.Today ? "text-danger" : "")"
+                            data-date="@doc.EffectiveDate?.ToString("yyyy-MM-dd")">
+                            @doc.EffectiveDate?.ToString("dd MMM yyyy")
+                        </td>
+                        <td class="status">@doc.Status</td>
+                        <td>
+                            <div class="preview-options">
+                                @if (hasMultiple)
+                                {
+                                    <button class="btn btn-sm btn-outline-primary preview-btn play-fullscreen-video"
+                                            data-video-url="@videoUrl" data-file-name="@videoFileName">
+                                        <i class="fas fa-play-circle"></i> Play Video
+                                    </button>
+                                    <a asp-controller="SopDept" asp-action="View" asp-route-id="@doc.Id"
+                                       class="btn btn-sm btn-outline-danger preview-btn">
+                                        <i class="fas fa-file-pdf"></i> PDF
+                                    </a>
+                                }
+                                else if (isVideo || hasVideo)
+                                {
+                                    <button class="btn btn-sm btn-outline-primary preview-btn play-fullscreen-video"
+                                            data-video-url="@videoUrl" data-file-name="@videoFileName">
+                                        <i class="fas fa-play-circle"></i> Play Video
+                                    </button>
+                                }
+                                else if (isPdf || hasPdf)
+                                {
+                                    <a asp-controller="SopDept" asp-action="View" asp-route-id="@doc.Id"
+                                       class="btn btn-sm btn-outline-danger preview-btn">
+                                        <i class="fas fa-file-pdf"></i> View PDF
+                                    </a>
+                                }
+                                else
+                                {
+                                    <a asp-controller="SopDept" asp-action="View" asp-route-id="@doc.Id"
+                                       class="btn btn-sm btn-outline-secondary preview-btn">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<!-- Video Preview Modal -->
+<div class="modal fade video-preview-modal" id="videoPreviewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="videoPreviewModalLabel">Video Preview</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <video id="modalVideoPlayer" class="w-100" controls controlsList="nodownload" oncontextmenu="return false;" style="max-height: 80vh;">
+                    Your browser does not support the video tag.
+                </video>
+            </div>
+            <div class="modal-footer">
+                <small class="text-muted">Video controls are available but download is disabled</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const tableBody = document.getElementById("docTableBody");
+            const headers = document.querySelectorAll(".sort");
+
+            // Search
+            const searchInput = document.getElementById("searchInput");
+            if (searchInput) {
+                searchInput.addEventListener("keyup", function () {
+                    const filter = this.value.toLowerCase();
+                    tableBody.querySelectorAll("tr").forEach(row => {
+                        row.style.display = row.textContent.toLowerCase().includes(filter) ? "" : "none";
+                    });
+                });
+            }
+
+            // Sorting
+            headers.forEach(header => {
+                header.addEventListener("click", function () {
+                    const column = this.dataset.sort;
+                    const ascending = this.dataset.order !== "desc";
+                    this.dataset.order = ascending ? "desc" : "asc";
+
+                    const rows = Array.from(tableBody.querySelectorAll("tr"));
+                    rows.sort((a, b) => {
+                        let aVal = a.querySelector(`.${column}`).textContent.trim();
+                        let bVal = b.querySelector(`.${column}`).textContent.trim();
+                        if (column === 'effectiveDate') {
+                            const aDate = a.querySelector(`.${column}`).dataset.date;
+                            const bDate = b.querySelector(`.${column}`).dataset.date;
+                            return ascending ? (aDate || '').localeCompare(bDate || '') : (bDate || '').localeCompare(aDate || '');
+                        }
+                        return ascending ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+                    });
+                    rows.forEach(row => tableBody.appendChild(row));
+                });
+            });
+
+            // Video modal
+            const modalVideoPlayer = document.getElementById('modalVideoPlayer');
+            const videoPreviewModal = new bootstrap.Modal(document.getElementById('videoPreviewModal'));
+
+            document.querySelectorAll('.play-fullscreen-video').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const url = this.getAttribute('data-video-url');
+                    const fileName = this.getAttribute('data-file-name');
+                    if (!url || url === '#') { alert('Video not available'); return; }
+
+                    document.getElementById('videoPreviewModalLabel').textContent = `Video Preview - ${fileName}`;
+                    modalVideoPlayer.src = url;
+                    videoPreviewModal.show();
+
+                    modalVideoPlayer.play().catch(() => { modalVideoPlayer.controls = true; });
+                });
+            });
+
+            document.getElementById('videoPreviewModal').addEventListener('hidden.bs.modal', () => {
+                modalVideoPlayer.pause();
+                modalVideoPlayer.currentTime = 0;
+                modalVideoPlayer.src = '';
+            });
+        });
+    </script>
+}

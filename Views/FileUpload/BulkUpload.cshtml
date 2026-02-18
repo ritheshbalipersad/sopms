@@ -1,0 +1,298 @@
+﻿@using Microsoft.AspNetCore.Identity
+@{
+    ViewData["Title"] = "Bulk Upload SOPs";
+}
+
+<!-- Loading Indicator -->
+<div id="loadingIndicator" class="d-none" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(255,255,255,0.8); z-index: 9999; display: flex; justify-content: center; align-items: center;">
+    <div class="text-center">
+        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-3 fs-5 fw-semibold">Processing your upload, please wait...</p>
+        <p class="text-muted">This may take a few moments depending on file sizes</p>
+        <div class="progress mt-3" style="width: 300px; margin: 0 auto;">
+            <div id="uploadProgress" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Add a new modal for detailed error display -->
+<div class="modal fade" id="errorDetailsModal" tabindex="-1" aria-labelledby="errorDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-danger border-3">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title fw-bold" id="errorDetailsModalLabel">
+                    <i class="fas fa-exclamation-circle me-2"></i> Upload Issues Detected
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="errorDetailsContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Results Display Area -->
+<div id="uploadResults" class="d-none">
+    <!-- Results will be displayed here -->
+</div>
+
+<form id="uploadForm" enctype="multipart/form-data" method="post">
+    <div class="row justify-content-center mt-5 mb-5">
+        <div class="col-md-10 col-lg-8">
+            <!-- Combined Header -->
+            <div class="text-center mb-4">
+                <h1 class="fw-bold"><i class="fas fa-upload me-2"></i> Bulk Document Upload</h1>
+                <p class="lead">Upload your documents and metadata in one step</p>
+            </div>
+
+            <div id="statusAlert" class="alert d-none text-center fw-bold">
+                <!-- Status messages will appear here -->
+            </div>
+
+            <!-- Files Upload Section -->
+            @if (User.Identity.IsAuthenticated && User.IsInRole("Admin"))
+            {
+                <!-- Document Type Selection -->
+                <div class="card shadow-lg border-0 rounded-4 mb-4">
+                    <div class="card-header bg-secondary text-white rounded-top-4">
+                        <h4 class="mb-0"><i class="fas fa-layer-group me-2"></i> Step 0: Select Document Type</h4>
+                    </div>
+                    <div class="card-body px-4">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-floating">
+                                    <select class="form-select" name="docType" id="docTypeSelect" required>
+                                        <option value="" disabled selected>Select Document Type</option>
+                                        @if (ViewData["Documents"] != null)
+                                        {
+                                            foreach (var docType in (List<string>)ViewData["Documents"])
+                                            {
+                                                <option value="@docType">@docType</option>
+                                            }
+                                        }
+                                    </select>
+                                    <label for="docTypeSelect" class="fw-semibold">
+                                        <i class="fas fa-book me-2"></i>Document Type
+                                    </label>
+                                    <div class="invalid-feedback">Please select a document type</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Documents Selection -->
+                <div class="card shadow-lg border-0 rounded-4 mb-4">
+                    <div class="card-header bg-primary text-white rounded-top-4">
+                        <h4 class="mb-0"><i class="fas fa-copy me-2"></i> Step 1: Upload Your Documents</h4>
+                    </div>
+                    <div class="card-body px-4">
+                        <div class="mb-3">
+                            <label for="files" class="form-label">
+                                <i class="fas fa-file-upload me-2"></i> Select Multiple Files
+                            </label>
+                            <input type="file" name="files" id="filesInput" class="form-control" accept=".pdf,.doc,.docx,.xlsx,.xls" multiple />
+                            <small class="form-text text-muted">Supported formats: PDF, Word, Excel. PDF recommended for viewing.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Metadata excel Section -->
+                <div class="card shadow-lg border-0 rounded-4">
+                    <div class="card-header bg-dark text-white rounded-top-4">
+                        <h4 class="mb-0"><i class="fas fa-file-excel me-2"></i> Step 2: Provide Metadata</h4>
+                    </div>
+                    <div class="card-body px-4">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i> You must upload an Excel file with metadata.
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label for="excelFile" class="form-label mb-0">
+                                    <i class="fas fa-file-excel me-2"></i> Upload Metadata Excel File
+                                </label>
+                                <a href="~/templates/DocUpload_Template.xlsx" download class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-download me-1"></i> Download Template
+                                </a>
+                            </div>
+                            <input type="file" class="form-control" name="excelFile" id="excelFileInput" accept=".xlsx,.xls" />
+                            <small class="form-text text-muted">Excel file should follow the template format.</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-success btn-lg shadow-sm" id="submitButton">
+                        <i class="fas fa-cloud-upload-alt me-2"></i> Process Bulk Upload
+                    </button>
+                </div>
+            }
+            <!-- Home Button -->
+            <div class="d-flex justify-content-end mt-3">
+                <a asp-controller="Home" asp-action="Index" class="btn btn-outline-secondary">
+                    <i class="fas fa-home me-2"></i> Home
+                </a>
+            </div>
+        </div>
+    </div>
+</form>
+
+<!-- FontAwesome -->
+<link rel="stylesheet" href="~/lib/fontawesome/css/all.min.css" />
+
+@section Scripts {
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+    $(document).ready(function () {
+        // Show loading indicator when form is submitted via AJAX
+        $('#uploadForm').on('submit', function(e) {
+            e.preventDefault();
+            
+            // Validate form
+            let hasFiles = $('#filesInput')[0].files.length > 0;
+            let hasExcel = $('#excelFileInput')[0].files.length > 0;
+            let hasDocType = $('#docTypeSelect').val();
+
+            if (!hasFiles || !hasExcel || !hasDocType) {
+                showAlert('Please upload both documents, metadata Excel file, and select a document type.', 'danger');
+                return false;
+            }
+
+            // Show loading indicator
+            $('#loadingIndicator').removeClass('d-none');
+            $('#submitButton').prop('disabled', true);
+            
+            // Submit form via AJAX
+            submitFormViaAjax();
+        });
+
+        function submitFormViaAjax() {
+            // Build FormData directly from the form
+            var formData = new FormData($('#uploadForm')[0]);
+
+            // Manually append docType (because it's a <select> and sometimes browsers skip it)
+            formData.append('docType', $('#docTypeSelect').val());
+
+            $.ajax({
+                url: '@Url.Action("UploadAll", "FileUpload")',
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                xhr: function () {
+                    var xhr = new window.XMLHttpRequest();
+
+                    // Track upload progress
+                    xhr.upload.addEventListener("progress", function (evt) {
+                        if (evt.lengthComputable) {
+                            var percentComplete = (evt.loaded / evt.total) * 100;
+                            $('#uploadProgress').css('width', percentComplete + '%');
+                        }
+                    }, false);
+
+                    return xhr;
+                },
+                success: function (response) {
+                    $('#loadingIndicator').addClass('d-none');
+                    $('#submitButton').prop('disabled', false);
+
+                    if (response.success) {
+                        showAlert(response.message, 'success');
+
+                        if (response.details) {
+                            $('#uploadResults').removeClass('d-none').html(response.details);
+                        }
+
+                        if (response.errors && response.errors.length > 0) {
+                            showErrorDetails(response.errors);
+                        }
+                    } else {
+                        showAlert(response.message, 'danger');
+
+                        if (response.errors && response.errors.length > 0) {
+                            showErrorDetails(response.errors);
+                        }
+                    }
+                },
+                error: function (xhr, status, error) {
+                    $('#loadingIndicator').addClass('d-none');
+                    $('#submitButton').prop('disabled', false);
+                    showAlert('An error occurred during upload: ' + error, 'danger');
+                }
+            });
+        }
+
+        
+        function showAlert(message, type) {
+            var alertClass = 'alert-' + type;
+            $('#statusAlert').removeClass('d-none alert-info alert-success alert-danger alert-warning')
+                             .addClass(alertClass)
+                             .html('<pre style="white-space: pre-wrap; margin-bottom: 0;">' + message + '</pre>');
+        }
+        
+        function showErrorDetails(errors) {
+            if (!Array.isArray(errors) || errors.length === 0) {
+                return;
+            }
+
+            function escapeHtml(text) {
+                return $('<div>').text(text).html();
+            }
+
+            // Group errors by category
+            let groupedErrors = {
+                'Duplicate SOP Numbers': errors.filter(e => e.includes('Duplicate SOP Number')),
+                'Missing Files': errors.filter(e => e.includes('Missing required file')),
+                'Extra Files': errors.filter(e => e.includes('is not referenced in the Excel metadata')),
+                'Other Errors': errors.filter(e =>
+                    !e.includes('Duplicate SOP Number') &&
+                    !e.includes('Missing required file') &&
+                    !e.includes('is not referenced in the Excel metadata')
+                )
+            };
+
+            let content = '<div class="accordion" id="errorsAccordion">';
+            Object.keys(groupedErrors).forEach((category, index) => {
+                if (groupedErrors[category].length > 0) {
+                    let collapseId = `collapse${index}`;
+                    let headingId = `heading${index}`;
+                    let expanded = index === 0 ? 'show' : '';
+                    let collapsedClass = index === 0 ? '' : 'collapsed';
+
+                    content += `
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="${headingId}">
+                                <button class="accordion-button ${collapsedClass}" type="button" data-bs-toggle="collapse" 
+                                    data-bs-target="#${collapseId}" aria-expanded="${index === 0}" aria-controls="${collapseId}">
+                                    ${escapeHtml(category)} (${groupedErrors[category].length})
+                                </button>
+                            </h2>
+                            <div id="${collapseId}" class="accordion-collapse collapse ${expanded}" aria-labelledby="${headingId}" 
+                                data-bs-parent="#errorsAccordion">
+                                <div class="accordion-body">
+                                    <ul class="mb-0">
+                                        ${groupedErrors[category].map(e => `<li>${escapeHtml(e)}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>`;
+                }
+            });
+            content += '</div>';
+
+            $('#errorDetailsContent').html(content);
+            new bootstrap.Modal(document.getElementById('errorDetailsModal')).show();
+        }
+    });
+    </script>
+}

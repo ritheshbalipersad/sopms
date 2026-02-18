@@ -1,0 +1,808 @@
+﻿@using System.Security.Claims
+@using SOPMSApp.ViewModels
+
+@{
+    ViewData["Title"] = "Home Page";
+
+    bool isLoggedIn = User.Identity?.IsAuthenticated ?? false;
+    bool isApprover = User.IsInRole("Admin") || User.IsInRole("Manager");
+
+    string iconClass = isApprover ? "fa-user-clock" : "fa-hourglass-half";
+    string label = isApprover ? "Pending Approvals" : "Expires in 30 Days";
+    string count = isApprover
+        ? (Model.PendingCount > 0 ? Model.PendingCount.ToString() : "N/A")
+        : (Model.TotalRenew > 0 ? Model.TotalRenew.ToString() : "N/A");
+
+}
+
+
+
+<!-- Styles -->
+<style>
+    .dashboard-container {
+        padding: 12px;
+        background-color: lightgray;
+        min-height: 100vh;
+        
+    }
+
+    .dashboard-card {
+        background: white;
+        border-radius: 1px;
+        padding: 2.5rem;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+        
+    }
+
+    .welcome-header {
+        margin-bottom: 2.5rem;
+        padding-bottom: 1.5rem;
+        border-bottom: 1px solid #eee;
+    }
+
+        .welcome-header h1 {
+            color: #2c3e50;
+            font-size: 2.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+    .chart-container {
+        margin-top: 1.5rem;
+    }
+
+    .chart-wrapper {
+        height: 500px;
+        position: relative;
+        margin: 0 auto;
+    }
+
+    /* Sidebar Shared Styles */
+    .sidebar-box {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .sidebar-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+        .sidebar-list li {
+            margin-bottom: 10px;
+        }
+
+        .sidebar-list a {
+            display: block;
+            padding: 10px 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            color: #333;
+            text-decoration: none;
+            transition: all 0.3s ease;
+        }
+
+            .sidebar-list a:hover {
+                background-color: #007bff;
+                color: white;
+            }
+
+        .sidebar-list i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
+
+    /* Spinner */
+    .spinner-border {
+        display: inline-block;
+        width: 1rem;
+        height: 1rem;
+        vertical-align: text-bottom;
+        border: 0.25em solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: spinner-border 0.75s linear infinite;
+    }
+
+    /* Custom styles for the statistics cards */
+    .stat-card {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
+
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.1) !important;
+        }
+
+        .stat-card .stat-card-icon {
+            opacity: 0.5;
+        }
+
+    .text-xs {
+        font-size: 0.8rem;
+    }
+
+    @@keyframes spinner-border {
+        to {
+            transform: rotate(360deg);
+        }
+    }
+
+    /* Chart Tabs */
+    .chart-tabs {
+        margin: 20px 0;
+    }
+
+        .chart-tabs .nav-tabs {
+            border-bottom: 2px solid #dee2e6;
+            justify-content: center;
+        }
+
+        .chart-tabs .nav-link {
+            color: #495057;
+            font-weight: 500;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+            .chart-tabs .nav-link:hover {
+                color: #007bff;
+                border-color: #b3d7ff;
+            }
+
+            .chart-tabs .nav-link.active {
+                color: #007bff;
+                background-color: transparent;
+                border-color: #007bff;
+            }
+
+    .tab-content {
+        padding: 1.5rem 0;
+    }
+
+    /* Table */
+    .table {
+        margin-top: 2rem;
+        font-size: 0.95rem;
+    }
+
+        .table th {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.8rem;
+            letter-spacing: 0.5px;
+            background-color: #2c3e50;
+            color: white;
+        }
+
+        .table tbody tr:hover {
+            background-color: rgba(0, 123, 255, 0.05);
+        }
+
+        .table tfoot td {
+            font-weight: 600;
+            background-color: #f8f9fa !important;
+        }
+
+    .badge {
+        font-size: 0.8rem;
+        padding: 0.35rem 0.75rem;
+        font-weight: 500;
+        letter-spacing: 0.5px;
+    }
+
+    .tab-pane canvas {
+        height: 500px !important;
+        width: 100% !important;
+    }
+
+    /* Fade-in Animation */
+    @@keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* Responsive */
+    @@media (max-width: 768px) {
+        .dashboard-container {
+            padding: 1rem;
+        }
+
+        .dashboard-card {
+            padding: 1.5rem;
+        }
+
+        .chart-wrapper {
+            height: 350px;
+        }
+
+        .nav-tabs .nav-link {
+            padding: 0.5rem 1rem;
+            font-size: 0.85rem;
+        }
+
+        .table {
+            font-size: 0.85rem;
+        }
+    }
+</style>
+
+<div class="container-xxl dashboard-container">
+    <div class="row">
+        <div class="align-content-lg-stretch">
+            <div class="dashboard-card">
+                <div class="welcome-header text-center">
+                    @{
+                        var laborName = User.FindFirst("LaborName")?.Value ?? User.Identity?.Name;
+                        var role = User.FindFirst(ClaimTypes.Role)?.Value ?? "Admin";
+                        var dept = User.FindFirst("DepartmentID")?.Value ?? "Admin";
+                        var email = User.FindFirst("Email")?.Value ?? "N/A";
+                        var accessGroup = User.FindFirst("AccessGroupID")?.Value ?? "N/A";
+                    }
+                    @if (!string.IsNullOrEmpty(laborName))
+                    {
+                        <div class="card shadow-sm p-4 mt-3 border-0 rounded-3 bg-light">
+                            <h1 class="fw-bold text-primary">Welcome Back, @laborName!</h1>
+
+                            <ul class="list-unstyled mt-3">
+                                <li><i class="fas fa-id-badge me-2 text-secondary"></i> <strong>User:</strong> @role</li>
+                                <li><i class="fas fa-building me-2 text-secondary"></i> <strong>Department:</strong> @dept</li>
+                                <li><i class="fas fa-envelope me-2 text-secondary"></i> <strong>Email:</strong> @email</li>
+                                
+                            </ul>
+                        </div>
+                    }
+                    else
+                    {
+                        <h1 class="fw-bold ">Welcome !</h1>
+                    }
+
+                    <p class="lead">Centralized Documents Management System-sopms</p>
+                   
+                </div>
+              
+                <div class="chart-container container-fluid py-4">
+                   
+                    <!-- Tab Navigation -->
+                    <ul class="nav nav-tabs mb-4" id="chartTabs" role="tablist">
+                        <!-- Key Statistics tab first -->
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="Statistics-tab" data-bs-toggle="tab" data-bs-target="#KeyStatistics" type="button" role="tab" aria-controls="KeyStatistics" aria-selected="true">
+                                <i class="fas fa-chart-pie me-2"></i>Key Statistics
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="bar-tab" data-bs-toggle="tab" data-bs-target="#barChartTab" type="button" role="tab" aria-controls="barChartTab" aria-selected="false">
+                                <i class="fas fa-chart-bar me-2"></i>Department Analysis
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="pie-tab" data-bs-toggle="tab" data-bs-target="#pieChartTab" type="button" role="tab" aria-controls="pieChartTab" aria-selected="false">
+                                <i class="fas fa-pie-chart me-2"></i>Status Overview
+                            </button>
+                        </li>
+                    </ul>
+
+
+                    <div class="tab-content" id="chartTabsContent">
+
+                        <!-- Key Statistics -->
+                        <div class="tab-pane fade show active" id="KeyStatistics" role="tabpanel">
+                            <div class="row g-4">
+                                <!-- Stat Card -->
+                                <div class="col-xl-4 col-md-6">
+                                    <div class="card stat-card border-0 shadow h-100">
+                                        <div class="card-body d-flex align-items-center">
+                                            <div class="stat-card-icon text-success me-3">
+                                                <i class="fas fa-check-circle fa-3x"></i>
+                                            </div>
+                                            <div>
+                                                <div class="text-xs fw-bold text-success text-uppercase mb-1">Active SOPs</div>
+                                                <div class="h4 fw-bold">@((Model.ActiveSopCount > 0) ? Model.ActiveSopCount.ToString() : "N/A")</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Compliance Rate -->
+                                <div class="col-xl-4 col-md-6">
+                                    <div class="card stat-card border-0 shadow h-100">
+                                        <div class="card-body d-flex align-items-center">
+                                            <div class="stat-card-icon text-primary me-3">
+                                                <i class="fas fa-chart-line fa-3x"></i>
+                                            </div>
+                                            <div>
+                                                <div class="text-xs fw-bold text-primary text-uppercase mb-1">Compliance Rate</div>
+                                                <div class="h4 fw-bold">@((Model.ComplianceRate > 0) ? $"{Model.ComplianceRate:F1}%" : "N/A")</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Pending / Expires in 30 Days -->
+                                <div class="col-xl-4 col-md-6">
+                                    @if (isLoggedIn)
+                                    {
+                                        <!-- Logged-in users: clickable button/card -->
+                                        <a asp-controller="Approvals" asp-action="Approvals" class="card stat-card border-0 shadow h-100 text-decoration-none">
+                                            <div class="card-body d-flex align-items-center">
+                                                <div class="stat-card-icon text-warning me-3">
+                                                    <i class="fas @iconClass fa-3x"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="text-xs fw-bold text-warning text-uppercase mb-1">@label</div>
+                                                    <div class="h4 fw-bold">@count</div>
+                                                </div>
+                                            </div>
+                                        </a>
+                                    }
+                                    else
+                                    {
+                                        <!-- Not logged in: static card only -->
+                                        <div class="card stat-card border-0 shadow h-100">
+                                            <div class="card-body d-flex align-items-center">
+                                                <div class="stat-card-icon text-warning me-3">
+                                                    <i class="fas @iconClass fa-3x"></i>
+                                                </div>
+                                                <div>
+                                                    <div class="text-xs fw-bold text-warning text-uppercase mb-1">@label</div>
+                                                    <div class="h4 fw-bold">@count</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    }
+                                </div>
+
+
+                                <!-- Expired -->
+                                <div class="col-xl-4 col-md-6">
+                                    <div class="card stat-card border-0 shadow h-100">
+                                        <div class="card-body d-flex align-items-center">
+                                            <div class="stat-card-icon text-danger me-3">
+                                                <i class="fas fa-times-circle fa-3x"></i>
+                                            </div>
+                                            <div>
+                                                <div class="text-xs fw-bold text-danger text-uppercase mb-1">Total Expired</div>
+                                                <div class="h4 fw-bold">@((Model.TotalExpired > 0) ? Model.TotalExpired.ToString() : "N/A")</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Total Docs -->
+                                <div class="col-xl-4 col-md-6">
+                                    <div class="card stat-card border-0 shadow h-100">
+                                        <div class="card-body d-flex align-items-center">
+                                            <div class="stat-card-icon text-secondary me-3">
+                                                <i class="fas fa-file-alt fa-3x"></i>
+                                            </div>
+                                            <div>
+                                                <div class="text-xs fw-bold text-secondary text-uppercase mb-1">Total Files</div>
+                                                <div class="h4 fw-bold">@Model.TotalDocs</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Departments -->
+                                <div class="col-xl-4 col-md-6">
+                                    <div class="card stat-card border-0 shadow h-100">
+                                        <div class="card-body d-flex align-items-center">
+                                            <div class="stat-card-icon text-info me-3">
+                                                <i class="fas fa-building fa-3x"></i>
+                                            </div>
+                                            <div>
+                                                <div class="text-xs fw-bold text-info text-uppercase mb-1">Departments</div>
+                                                <div class="h4 fw-bold">@((Model.DepartmentCount > 0) ? Model.DepartmentCount.ToString() : "N/A")</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bar Chart -->
+                        
+                        <div class="tab-pane fade" id="barChartTab" role="tabpanel" aria-labelledby="bar-tab">
+                            <div class="chart-wrapper">
+                                <h3 class="text-center mb-4"><i class="fas fa-chart-bar"></i> SOPs by Departments </h3>
+                                <canvas id="sopChart"></canvas>
+                            </div>
+                        </div>
+
+                        
+
+                        <!-- Pie Chart -->
+                        <div class="tab-pane fade" id="pieChartTab" role="tabpanel" aria-labelledby="pie-tab">
+                            <h3 class="text-center mb-4"><i class="fas fa-pie-chart"></i> SOP Status by Effective Date</h3>
+                            <canvas id="sopStatusPieChart"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- Table -->
+                    <div class="card shadow-sm border-0 mt-4">
+                        <div class="card-body">
+                            <h5 class="mb-3"><i class="fas fa-table me-2"></i> Department Statistics</h5>
+                         
+                            <div class="table-responsive">
+                                <table class="table table-hover table-striped align-middle mb-0">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Department</th>
+                                            <th class="text-end">Reviewed (Last 30 Days)</th>
+                                            <th class="text-end">Total</th>
+                                            <th class="text-end">Active</th>
+                                            <th class="text-end">Renew</th>
+                                            <th class="text-end">Expired</th>
+                                            <th class="text-end">Active %</th>
+                                            <th class="text-end">Renew %</th>
+                                            <th class="text-end">Expired %</th>
+                                            <th class="text-end">Compliance %</th>
+
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var item in Model.DepartmentData)
+                                        {
+                                            <tr>
+                                                <td>@item.Department</td>
+                                                <td class="text-end">@item.ReviewedLast30Days</td>
+                                                <td class="text-end">@item.TotalCount</td>
+                                                <td class="text-end">@item.ActiveCount</td>
+                                                <td class="text-end">@item.RenewCount</td>
+                                                <td class="text-end">@item.ExpiredCount</td>
+                                                <td class="text-end">@item.ActivePercentage.ToString("0")%</td>
+                                                <td class="text-end">@item.RenewPercentage.ToString("0")%</td>
+                                                <td class="text-end">@item.ExpiredPercentage.ToString("0")%</td>
+                                                <td class="text-end">@item.Compliance_Rate.ToString("0")%</td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // Initialize chart contexts
+        const ctx = document.getElementById('sopChart');
+        const pieCtx = document.getElementById('sopStatusPieChart');
+
+        // Update current date and time
+        function updateDateTime() {
+            const now = new Date();
+            document.getElementById('currentDateTime').textContent = now.toLocaleString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        updateDateTime();
+
+        // Logout form handling
+        const logoutForm = document.getElementById('logoutForm');
+        if (logoutForm) {
+            logoutForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                const button = this.querySelector('button');
+                const originalText = button.innerHTML;
+                button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Logging out...';
+                button.disabled = true;
+                this.submit();
+            });
+        }
+
+        // Department abbreviation mapping
+        function abbreviateDepartment(dept) {
+            if (!dept) return '';
+            const abbreviationMap = {
+                'Maintenance': 'MNT',
+                'Management': 'MGT',
+                'Production': 'PRD',
+                'Quality': 'QLT',
+                'Safety': 'SFT',
+                'HR': 'HR',
+                'Sales': 'SLS',
+                'Prod. Control': 'P.C.'
+            };
+            return dept.split(',').map(part => abbreviationMap[part.trim()] || part.trim()).join(', ');
+        }
+
+        // Chart instances storage
+        let sopBarChart = null;
+        let sopPieChart = null;
+
+        // Process data and create charts
+        function createCharts(data) {
+            // Clear previous charts if they exist
+            if (sopBarChart) {
+                sopBarChart.destroy();
+            }
+            if (sopPieChart) {
+                sopPieChart.destroy();
+            }
+
+            const processedData = data.departmentData.map(d => ({
+                department: abbreviateDepartment(d.department),
+                active: d.active,
+                expired: d.expired,
+                renew: d.renew,
+                reviewed: d.reviewedLast30DaysCount || d.reviewedLast30Days || d.reviewed
+            }));
+
+
+            const departments = processedData.map(d => d.department);
+            const activeData = processedData.map(d => d.active);
+            const expiredData = processedData.map(d => d.expired);
+            const renewData = processedData.map(d => d.renew);
+
+            // Bar Chart - SOP Status by Department
+            sopBarChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: departments,
+                    datasets: [
+                        
+                        {
+                            label: 'Reviewed (Last 30 Days)',
+                            data: processedData.map(d => d.reviewed),
+                            backgroundColor: '#36A2EB',
+                            borderColor: '#1E7FC9',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Active SOPs',
+                            data: activeData,
+                            backgroundColor: '#32CD32',
+                            borderColor: '#2A8A8A',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Renew SOPs',
+                            data: renewData,
+                            backgroundColor: '#FFC107',
+                            borderColor: '#D4A506',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Expired SOPs',
+                            data: expiredData,
+                            backgroundColor: '#FF6384',
+                            borderColor: '#E04A6A',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }
+                        
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                padding: 15,
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            cornerRadius: 6
+                        }
+                    },
+                    scales: {
+                        x: {
+                            stacked: true,
+                            grid: {
+                                display: false
+                            },
+                            title: {
+                                display: true,
+                                text: 'Departments',
+                                font: {
+                                    weight: 'bold',
+                                    size: 13
+                                },
+                                padding: { top: 10, bottom: 10 }
+                            },
+                            ticks: {
+                                maxRotation: 45
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0, 0, 0, 0.05)'
+                            },
+                            title: {
+                                display: true,
+                                text: 'Number of SOPs',
+                                font: {
+                                    weight: 'bold',
+                                    size: 13
+                                },
+                                padding: { top: 10, bottom: 10 }
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 1000,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+
+                // Pie Chart - Overall SOP Status Distribution
+            sopPieChart = new Chart(pieCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Active SOPs', 'Near Expiry SOPs', 'Expired SOPs', 'Reviewed (Last 30 Days)'],
+                    datasets: [{
+                        data: [
+                            data.overallData.totalActive || data.overallData.activeSopCount,
+                            data.overallData.totalRenew,
+                            data.overallData.totalExpired,
+                            data.overallData.totalReviewedLast30Days || data.overallData.totalReviewed // FIXED THIS LINE
+                        ],
+                        backgroundColor: [
+                            '#32CD32', // Active - Teal
+                            '#FFC107', // Near Expiry - Amber
+                            '#FF6384', // Expired - Pink
+                            '#36A2EB'  // Reviewed - Blue
+                        ],
+                        borderColor: '#ffffff',
+                        borderWidth: 2,
+                        hoverOffset: 15
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                padding: 15,
+                                font: {
+                                    size: 12
+                                },
+                                usePointStyle: true,
+                                pointStyle: 'circle'
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            padding: 12,
+                            cornerRadius: 6,
+                            callbacks: {
+                                label: function (context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        animateScale: true,
+                        animateRotate: true,
+                        duration: 1000,
+                        easing: 'easeOutQuart'
+                    },
+                    cutout: '0%'
+                }
+            });
+        }
+
+        // Export functions
+        function setupExportHandlers() {
+            // PDF export
+            document.getElementById('exportPdf')?.addEventListener('click', function() {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF();
+
+                html2canvas(document.getElementById('pdfContent')).then(canvas => {
+                    const imgData = canvas.toDataURL('image/png');
+                    const imgWidth = doc.internal.pageSize.getWidth() - 20;
+                    const imgHeight = canvas.height * imgWidth / canvas.width;
+
+                    doc.addImage(imgData, 'PNG', 10, 10, imgWidth, imgHeight);
+                    doc.save('SOP-Dashboard.pdf');
+                });
+            });
+
+            // Chart download
+            document.getElementById('downloadChart')?.addEventListener('click', function() {
+                const activeTab = document.querySelector('.nav-link.active').id;
+                const canvas = activeTab === 'bar-tab' ? document.getElementById('sopChart') : document.getElementById('sopStatusPieChart');
+
+                const link = document.createElement('a');
+                link.download = activeTab === 'bar-tab' ? 'SOP-Bar-Chart.png' : 'SOP-Pie-Chart.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
+        }
+
+        // Load data from API
+        async function loadSopData() {
+        try {
+            const response = await fetch('@Url.Action("GetSopStatusData", "Home")');
+            if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+            const data = await response.json();
+                createCharts(data);
+            } catch (error) {
+                console.error('Error loading SOP data:', error);
+                // Fallback to sample data if needed
+                const sampleData = {
+                    departmentData: [
+                        { department: "HR", active: 12, expired: 3, renew: 2 },
+                        { department: "Management", active: 15, expired: 1, renew: 4 },
+                        { department: "Quality", active: 20, expired: 5, renew: 3 },
+                        { department: "Production", active: 25, expired: 7, renew: 5 },
+                        { department: "Sales", active: 8, expired: 2, renew: 1 },
+                        { department: "PControl", active: 10, expired: 4, renew: 2 },
+                        { department: "Maintenance", active: 18, expired: 6, renew: 3 },
+                        { department: "Safety", active: 14, expired: 3, renew: 2 }
+                    ],
+                    overallData: {
+                        totalActive: 122,
+                        totalExpired: 31,
+                        totalRenew: 22
+                    }
+                };
+                createCharts(sampleData);
+            }
+        }
+
+        // Initialize everything
+        setupExportHandlers();
+        loadSopData();
+
+        // Auto-refresh every 5 minutes
+        const refreshInterval = setInterval(loadSopData, 5 * 60 * 1000);
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            clearInterval(refreshInterval);
+            if (sopBarChart) sopBarChart.destroy();
+            if (sopPieChart) sopPieChart.destroy();
+        });
+    });
+</script>
+

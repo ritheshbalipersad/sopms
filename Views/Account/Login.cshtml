@@ -1,0 +1,630 @@
+﻿@model SOPMSApp.ViewModels.LoginViewModel
+
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SOPMS Login</title>
+
+    <!-- Bootstrap & Font Awesome -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <style>
+        /* Disable all scrolling */
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Full screen split layout */
+        .login-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+        }
+
+        /* LEFT SIDE BRANDING */
+        .login-brand {
+            width: 45%;
+            background: linear-gradient(135deg, #023e8a 0%, #0077b6 100%);
+            color: white;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .brand-logo {
+            width: 120px;
+            height: 120px;
+            margin-bottom: 25px;
+            filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @@keyframes float {
+            0%, 100%
+
+        {
+            transform: translateY(0);
+        }
+
+        50% {
+            transform: translateY(-10px);
+        }
+
+        }
+
+        .login-brand h1 {
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .login-brand p {
+            font-size: 18px;
+            opacity: 0.9;
+            margin-bottom: 40px;
+            max-width: 400px;
+            line-height: 1.5;
+        }
+
+        /* Branding decorative elements */
+        .brand-decoration {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100px;
+            background: rgba(255, 255, 255, 0.05);
+            clip-path: polygon(0 100%, 100% 0, 100% 100%, 0 100%);
+        }
+
+        .brand-features {
+            margin-top: 40px;
+            text-align: left;
+            max-width: 400px;
+        }
+
+        .feature-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            font-size: 15px;
+            opacity: 0.9;
+        }
+
+            .feature-item i {
+                margin-right: 12px;
+                color: #90e0ef;
+                font-size: 16px;
+            }
+
+        /* RIGHT SIDE LOGIN FORM */
+        .login-card {
+            width: 55%;
+            padding: 60px 80px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            background: #ffffff;
+            overflow-y: auto; /* Only allow scroll inside form if needed */
+            max-height: 100vh;
+        }
+
+            .login-card h3 {
+                color: #023e8a;
+                font-weight: 700;
+                margin-bottom: 10px;
+                font-size: 28px;
+            }
+
+        .welcome-text {
+            color: #6c757d;
+            text-align: center;
+            margin-bottom: 40px;
+            font-size: 16px;
+        }
+
+        /* Form styling */
+        .login-form {
+            max-width: 400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .form-group-custom {
+            margin-bottom: 25px;
+        }
+
+        .form-label-custom {
+            font-weight: 600;
+            color: #495057;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+
+            .form-label-custom i {
+                margin-right: 10px;
+                color: #023e8a;
+                width: 20px;
+            }
+
+        .input-group-custom {
+            position: relative;
+        }
+
+        .form-control-custom {
+            width: 100%;
+            padding: 14px 16px 14px 45px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s;
+            background: #f8f9fa;
+        }
+
+            .form-control-custom:focus {
+                border-color: #023e8a;
+                background: white;
+                box-shadow: 0 0 0 4px rgba(2, 62, 138, 0.1);
+                outline: none;
+            }
+
+        .input-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #6c757d;
+            pointer-events: none;
+        }
+
+        .password-toggle {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #6c757d;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+            .password-toggle:hover {
+                color: #023e8a;
+            }
+
+        /* Options */
+        .form-options {
+            display: flex;
+            justify-content: flex-end;
+            margin: 20px 0 30px;
+        }
+
+        .form-check-custom {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: #6c757d;
+        }
+
+        /* Submit button */
+        .btn-login {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, #023e8a 0%, #0077b6 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            position: relative;
+            overflow: hidden;
+        }
+
+            .btn-login:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 10px 25px rgba(2, 62, 138, 0.3);
+            }
+
+            .btn-login:active {
+                transform: translateY(0);
+            }
+
+            .btn-login i {
+                font-size: 18px;
+            }
+
+        /* Links */
+        .form-links {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 30px;
+            padding-top: 25px;
+            border-top: 1px solid #eaeaea;
+        }
+
+        .link-custom {
+            color: #023e8a;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 15px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+            .link-custom:hover {
+                color: #0077b6;
+                transform: translateY(-2px);
+            }
+
+        /* Error message */
+        .alert-custom {
+            background: #ffe6e6;
+            color: #dc3545;
+            border: none;
+            border-radius: 10px;
+            padding: 15px 20px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @@keyframes slideIn {
+            from
+
+        {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        }
+
+        /* Footer */
+        .card-footer-section {
+            text-align: center;
+            margin-top: 40px;
+            color: #6c757d;
+            font-size: 14px;
+            padding-top: 20px;
+            border-top: 1px solid #eaeaea;
+        }
+
+        .security-info i {
+            color: #28a745;
+            margin-right: 8px;
+        }
+
+        /* RESPONSIVE DESIGN */
+        @@media (max-width: 1024px) {
+            .login-brand
+
+        {
+            width: 40%;
+            padding: 30px;
+        }
+
+        .login-card {
+            width: 60%;
+            padding: 40px;
+        }
+
+        .brand-logo {
+            width: 100px;
+            height: 100px;
+        }
+
+        .login-brand h1 {
+            font-size: 36px;
+        }
+
+        }
+
+        .back-to-home {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 10;
+        }
+
+        @@media (max-width: 768px) {
+            .login-container
+
+        {
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .login-brand {
+            width: 100%;
+            height: 35%;
+            padding: 30px 20px;
+            min-height: 250px;
+        }
+
+        .login-card {
+            width: 100%;
+            height: 65%;
+            padding: 30px 20px;
+            overflow-y: auto;
+        }
+
+        .brand-logo {
+            width: 80px;
+            height: 80px;
+        }
+
+        .login-brand h1 {
+            font-size: 32px;
+        }
+
+        .login-form {
+            max-width: 100%;
+        }
+
+        .form-links {
+            flex-direction: column;
+            gap: 15px;
+            align-items: center;
+        }
+
+        }
+
+        @@media (max-height: 700px) {
+            .login-brand
+
+        {
+            padding: 20px;
+        }
+
+        .login-card {
+            padding: 30px;
+        }
+
+        .brand-logo {
+            width: 80px;
+            height: 80px;
+            margin-bottom: 15px;
+        }
+
+        .login-brand h1 {
+            font-size: 28px;
+        }
+
+        }
+
+    </style>
+</head>
+
+<body>
+    <div class="login-container">
+        <!-- LEFT SIDE BRANDING -->
+        <div class="login-brand">
+            <img src="~/logo1.png" class="brand-logo" alt="SOPMS Logo" />
+            <h1>SOPMS</h1>
+            <p>Document Management System</p>
+
+            <div class="brand-features">
+                <div class="feature-item">
+                    <i class="fas fa-shield-alt"></i>
+                    <span>Secure & Encrypted Storage</span>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-file-contract"></i>
+                    <span>ISO 9001 Compliant</span>
+                </div>
+                <div class="feature-item">
+                    <i class="fas fa-users"></i>
+                    <span>Role-Based Access Control</span>
+                </div>
+               
+            </div>
+
+            <div class="brand-decoration"></div>
+        </div>
+
+        <!-- RIGHT SIDE LOGIN FORM -->
+        <div class="login-card">
+          
+
+            <div class="login-content">
+                <h3 class="text-center">Welcome Back</h3>
+                <p class="welcome-text">Sign in to access your documents</p>
+
+                <form asp-action="Login" method="post" novalidate class="login-form">
+                    <!-- Error Message -->
+                    @if (TempData["ErrorMessage"] != null)
+                    {
+                        <div class="alert-custom">
+                            <i class="fas fa-exclamation-circle"></i>
+                            <div>@TempData["ErrorMessage"]</div>
+                        </div>
+                    }
+
+                    <!-- Username Field -->
+                    <div class="form-group-custom">
+                        <label asp-for="logon" class="form-label-custom">
+                            <i class="fas fa-user"></i>Username
+                        </label>
+                        <div class="input-group-custom">
+                            <input asp-for="logon" class="form-control-custom"
+                                   placeholder="Enter your username" />
+                            <div class="input-icon">
+                                <i class="fas fa-user"></i>
+                            </div>
+                        </div>
+                        <span asp-validation-for="logon" class="text-danger small"></span>
+                    </div>
+
+                    <!-- Password Field -->
+                    <div class="form-group-custom">
+                        <label asp-for="Password" class="form-label-custom">
+                            <i class="fas fa-lock"></i>Password
+                        </label>
+                        <div class="input-group-custom">
+                            <input asp-for="Password" type="password"
+                                   class="form-control-custom"
+                                   id="passwordInput"
+                                   placeholder="Enter your password" />
+                            <button type="button" class="password-toggle" onclick="togglePassword()">
+                                <i class="fas fa-eye" id="passwordToggleIcon"></i>
+                            </button>
+                            <div class="input-icon">
+                                <i class="fas fa-lock"></i>
+                            </div>
+                        </div>
+                        <span asp-validation-for="Password" class="text-danger small"></span>
+                    </div>
+
+                    <!-- Show Password Option -->
+                    <div class="form-options">
+                        <div class="form-check-custom">
+                            <input type="checkbox" class="form-check-input"
+                                   id="showPasswordCheckbox" onclick="togglePassword()" />
+                            <label for="showPasswordCheckbox">Show Password</label>
+                        </div>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="form-submit">
+                        <button type="submit" class="btn-login" id="loginBtn">
+                            <i class="fas fa-sign-in-alt"></i>
+                            <span>Sign In</span>
+                        </button>
+                    </div>
+
+                    <!-- Additional Links -->
+                    <div class="form-links">
+                        <a href="http://ttsapdatvmaint.ttaf.local/mc_web/onsite/mc_signupstart.asp"
+                           class="link-custom" target="_blank">
+                            <i class="fas fa-user-plus"></i>
+                            Create Account
+                        </a>
+                        <a href="http://ttsapdatvmaint.ttaf.local/mc_web/onsite/mc_forgotpassword.asp"
+                           class="link-custom" target="_blank">
+                            <i class="fas fa-key"></i>
+                            Forgot Password?
+                        </a>
+                    </div>
+
+                    <!-- Footer -->
+                    <div class="card-footer-section">
+                        <div class="security-info">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>Secure Login • TTSAP Grade • ISO Compliant</span>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <!-- Back to Home Button - Top Right -->
+            <a asp-controller="Home" asp-action="Index" class="btn-back">
+                <i class="fas fa-arrow-left"></i>
+                Back to Home
+            </a>
+           
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // Prevent any scrolling
+        document.body.style.overflow = 'hidden';
+        document.documentElement.style.overflow = 'hidden';
+
+        function togglePassword() {
+            const passwordInput = document.getElementById('passwordInput');
+            const toggleIcon = document.getElementById('passwordToggleIcon');
+            const checkbox = document.getElementById('showPasswordCheckbox');
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                toggleIcon.className = 'fas fa-eye-slash';
+                checkbox.checked = true;
+            } else {
+                passwordInput.type = 'password';
+                toggleIcon.className = 'fas fa-eye';
+                checkbox.checked = false;
+            }
+        }
+
+        // Form submission handler
+        document.querySelector('.login-form').addEventListener('submit', function(e) {
+            const loginBtn = document.getElementById('loginBtn');
+            const originalContent = loginBtn.innerHTML;
+
+            // Show loading state
+            loginBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
+            loginBtn.disabled = true;
+
+            // If form validation fails, revert button state
+            if (!this.checkValidity()) {
+                setTimeout(() => {
+                    loginBtn.innerHTML = originalContent;
+                    loginBtn.disabled = false;
+                }, 500);
+            }
+        });
+
+        // Auto-focus on username field
+        document.addEventListener('DOMContentLoaded', function() {
+            const usernameInput = document.querySelector('input[name="logon"]');
+            if (usernameInput) {
+                setTimeout(() => usernameInput.focus(), 100);
+            }
+
+            // Enter key submits form
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.target.matches('button, a, input[type="checkbox"]')) {
+                    const form = document.querySelector('.login-form');
+                    if (form.checkValidity()) {
+                        form.submit();
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
