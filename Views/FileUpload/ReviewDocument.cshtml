@@ -1,0 +1,441 @@
+@model SOPMSApp.Models.DocRegister
+@{
+    ViewData["Title"] = "Replace Document (Admin)";
+    var docAreas = (Model.Area ?? "")
+        .Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+        .Select(a => a.Trim())
+        .Where(a => !string.IsNullOrEmpty(a))
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+    var nextRevision = ViewBag.NextRevision as string ?? "Rev: 1";
+    var lastReviewStr = Model.LastReviewDate?.ToString("yyyy-MM-dd") ?? DateTime.Now.ToString("yyyy-MM-dd");
+    var effectiveStr = Model.EffectiveDate?.ToString("yyyy-MM-dd") ?? "";
+}
+
+@if (User.Identity?.IsAuthenticated == true)
+{
+    <div class="container-fluid">
+        <form asp-action="ReplaceDocument" asp-controller="FileUpload" method="post" enctype="multipart/form-data" id="replaceForm" class="needs-validation" novalidate>
+            <input type="hidden" name="id" value="@Model.Id" />
+            <div class="row justify-content-center my-5">
+                <div class="col-lg-10 col-xl-8">
+                    <div class="card shadow-lg border-0 rounded-4 overflow-hidden">
+                        <header class="card-header bg-warning text-dark rounded-top-4 py-4">
+                            <div class="d-flex align-items-center justify-content-center">
+                                <i class="fas fa-sync-alt fa-2x me-3" aria-hidden="true"></i>
+                                <h1 class="h2 mb-0">Replace Document (Admin)</h1>
+                            </div>
+                            <p class="mb-0 mt-2 text-center small opacity-90">SOP @(Model.SopNumber) — current version will be archived</p>
+                        </header>
+
+                        <main class="card-body px-5 py-4">
+                            @{
+                                var originalDownloadUrl = !string.IsNullOrWhiteSpace(Model.OriginalFile) && !string.IsNullOrWhiteSpace(Model.DocType)
+                                    ? Url.Action("Originals", "FileAccess", new { docType = Model.DocType, fileName = Model.OriginalFile })
+                                    : null;
+                            }
+                            @if (!string.IsNullOrEmpty(originalDownloadUrl))
+                            {
+                                <div class="mb-3">
+                                    <a href="@originalDownloadUrl" class="btn btn-outline-primary" title="Download current original document" download>
+                                        <i class="fas fa-file-download me-2"></i>Download Original
+                                    </a>
+                                </div>
+                            }
+                            @if (TempData["Error"] != null)
+                            {
+                                <div class="alert alert-danger alert-dismissible fade show d-flex align-items-center">
+                                    <i class="fas fa-exclamation-circle fa-lg me-3" aria-hidden="true"></i>
+                                    <div>@TempData["Error"]</div>
+                                    <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            }
+
+                            <div class="alert alert-warning border-warning mb-4">
+                                <i class="fas fa-archive me-2"></i>
+                                <strong>Replace mode:</strong> Uploading a new original (and optional PDF/video) will <strong>replace</strong> the current document.
+                                The existing original file, PDF, and video (if any) will be moved to <strong>Archive / Replaced</strong> with full audit tracing.
+                            </div>
+
+                            <div class="row g-3">
+                                <!-- File Upload Section -->
+                                <div class="col-12">
+                                    <div class="card border-0 shadow-sm mb-3">
+                                        <div class="card-header bg-primary text-white py-2">
+                                            <h6 class="mb-0 d-flex align-items-center">
+                                                <i class="fas fa-upload me-2 fs-6"></i>New Files (replaces current)
+                                            </h6>
+                                        </div>
+                                        <div class="card-body p-3">
+                                            <div class="row g-3">
+                                                <div class="col-md-6">
+                                                    <div class="file-upload-card border rounded-2 p-3 h-100">
+                                                        <div class="d-flex align-items-center mb-2">
+                                                            <div class="icon-wrapper bg-primary bg-opacity-10 rounded-circle p-2 me-2">
+                                                                <i class="fas fa-file-alt text-primary fs-5"></i>
+                                                            </div>
+                                                            <div class="flex-grow-1">
+                                                                <h6 class="mb-0 fw-semibold">New Original Document</h6>
+                                                                <span class="badge bg-danger fs-7">Required</span>
+                                                            </div>
+                                                        </div>
+                                                        <div class="file-upload-wrapper" id="originalFileWrapper">
+                                                            <input type="file" name="OriginalFile" class="form-control file-upload-input"
+                                                                   id="originalFileInput" required
+                                                                   accept=".doc,.docx,.dot,.dotx,.xls,.xlsx,.xlt,.xltx,.ppt,.pptx,.pot,.potx,.pdf"
+                                                                   onchange="validateFileSelection(this)" />
+                                                            <div class="file-upload-mask text-center py-3">
+                                                                <div class="upload-icon mb-2">
+                                                                    <i class="fas fa-cloud-upload-alt fa-2x text-muted"></i>
+                                                                </div>
+                                                                <p class="file-upload-text mb-1 fw-medium fs-6">Drop file or click to upload</p>
+                                                                <p class="text-muted fs-7 mb-0">Max 100MB • DOC, DOCX, XLS, XLSX, PPT, PDF</p>
+                                                            </div>
+                                                        </div>
+                                                        <div class="mt-2">
+                                                            <small id="originalFileName" class="text-success fw-medium file-name d-block fs-7"></small>
+                                                            <div id="originalFileError" class="invalid-feedback d-block mt-1 fs-7"></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-6">
+                                                    <div class="row g-2 h-100">
+                                                        <div class="col-12">
+                                                            <div class="file-upload-card border rounded-2 p-2 h-100">
+                                                                <div class="d-flex align-items-center mb-1">
+                                                                    <div class="icon-wrapper bg-danger bg-opacity-10 rounded-circle p-1 me-2">
+                                                                        <i class="fas fa-file-pdf text-danger fs-6"></i>
+                                                                    </div>
+                                                                    <div class="flex-grow-1">
+                                                                        <h6 class="mb-0 fw-semibold fs-6">PDF Version</h6>
+                                                                        <span class="badge bg-secondary fs-7">Optional</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="file-upload-wrapper" id="pdfFileWrapper">
+                                                                    <input type="file" name="PdfFile" class="form-control file-upload-input"
+                                                                           id="pdfFileInput" accept=".pdf"
+                                                                           onchange="updateFileName('pdfFileInput', 'pdfFileName')" />
+                                                                    <div class="file-upload-mask py-1 px-2">
+                                                                        <i class="fas fa-plus-circle text-muted me-1 fs-6"></i>
+                                                                        <span class="file-upload-text fs-6">Add PDF</span>
+                                                                    </div>
+                                                                </div>
+                                                                <small id="pdfFileName" class="text-muted mt-1 d-block fs-7"></small>
+                                                            </div>
+                                                        </div>
+                                                        <div class="col-12">
+                                                            <div class="file-upload-card border rounded-2 p-2 h-100">
+                                                                <div class="d-flex align-items-center mb-1">
+                                                                    <div class="icon-wrapper bg-info bg-opacity-10 rounded-circle p-1 me-2">
+                                                                        <i class="fas fa-video text-info fs-6"></i>
+                                                                    </div>
+                                                                    <div class="flex-grow-1">
+                                                                        <h6 class="mb-0 fw-semibold fs-6">Training Video</h6>
+                                                                        <span class="badge bg-secondary fs-7">Optional</span>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="file-upload-wrapper" id="videoFileWrapper">
+                                                                    <input type="file" name="VideoFile" class="form-control file-upload-input"
+                                                                           id="videoFileInput" accept="video/*"
+                                                                           onchange="updateFileName('videoFileInput', 'videoFileName')" />
+                                                                    <div class="file-upload-mask py-1 px-2">
+                                                                        <i class="fas fa-plus-circle text-muted me-1 fs-6"></i>
+                                                                        <span class="file-upload-text fs-6">Add Video</span>
+                                                                    </div>
+                                                                </div>
+                                                                <small id="videoFileName" class="text-muted mt-1 d-block fs-7"></small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Document Information (pre-filled) -->
+                                <div class="col-12">
+                                    <div class="card border-0 shadow-sm mb-3">
+                                        <div class="card-header bg-primary text-white py-2">
+                                            <h6 class="mb-0 d-flex align-items-center">
+                                                <i class="fas fa-file-contract me-2 fs-6"></i>Document Information
+                                            </h6>
+                                        </div>
+                                        <div class="card-body p-3">
+                                            <div class="row g-3">
+                                                <div class="col-lg-6">
+                                                    <div class="row g-2">
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 fs-6">Document Type</label>
+                                                            <input type="text" class="form-control bg-light" value="@Model.DocType" readonly />
+                                                            <input type="hidden" name="docType" value="@Model.DocType" />
+                                                        </div>
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 fs-6">SOP Number <span class="text-danger">*</span></label>
+                                                            <input type="text" name="sopNumber" id="sopNumberInput" class="form-control" value="@Model.SopNumber" readonly />
+                                                        </div>
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 fs-6">Revision (new) <span class="text-danger">*</span></label>
+                                                            <input type="text" name="revision" class="form-control" value="@nextRevision" required />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-lg-6">
+                                                    <div class="row g-2">
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 fs-6">Replaced By</label>
+                                                            <input type="text" name="author" class="form-control bg-light" value="@(User.FindFirst("LaborName")?.Value ?? User.Identity?.Name)" readonly />
+                                                        </div>
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 fs-6">Department <span class="text-danger">*</span></label>
+                                                            <select class="form-select" name="department" required>
+                                                                @if (ViewData["Department"] != null)
+                                                                {
+                                                                    foreach (var dept in (List<SOPMSApp.Models.DepartmentModel>)ViewData["Department"])
+                                                                    {
+                                                                        <option value="@dept.DepartmentName" selected="@(string.Equals(dept.DepartmentName, Model.Department, StringComparison.OrdinalIgnoreCase))">@dept.DepartmentName</option>
+                                                                    }
+                                                                }
+                                                            </select>
+                                                        </div>
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 fs-6">Document Description <span class="text-danger">*</span></label>
+                                                            <textarea name="documentType" class="form-control" rows="3" required>@(Model.DocumentType ?? "")</textarea>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Review Schedule -->
+                                <div class="col-12">
+                                    <div class="card border-0 shadow-sm mb-3">
+                                        <div class="card-header bg-primary text-white py-2">
+                                            <h6 class="mb-0 d-flex align-items-center">
+                                                <i class="fas fa-calendar-alt me-2 fs-6"></i>Review Schedule
+                                            </h6>
+                                        </div>
+                                        <div class="card-body p-3">
+                                            <div class="row g-3">
+                                                <div class="col-lg-6">
+                                                    <div class="row g-2">
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 fs-6">Last Review Date <span class="text-danger">*</span></label>
+                                                            <input type="date" name="lastReviewDate" class="form-control" value="@lastReviewStr" max="@DateTime.Now.ToString("yyyy-MM-dd")" required onchange="validateDate(this)" />
+                                                        </div>
+                                                        <div class="col-12 mb-2">
+                                                            <label class="form-label fw-semibold mb-1 fs-6">Next Review Date</label>
+                                                            <div class="input-group">
+                                                                <span class="input-group-text bg-light py-1"><i class="fas fa-calendar text-muted fs-6"></i></span>
+                                                                <input type="date" name="effectiveDate" id="effectiveDate" class="form-control bg-light py-1" value="@effectiveStr" readonly />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-lg-6">
+                                                    <label class="form-label fw-semibold mb-2 fs-6">Review Frequency</label>
+                                                    <div class="frequency-selector p-2 border rounded-2 bg-light">
+                                                        <div class="row g-1">
+                                                            @for (int i = 1; i <= 7; i++)
+                                                            {
+                                                                <div class="col-4 col-md-3 col-lg-4">
+                                                                    <input type="radio" class="btn-check" name="yearOption" id="yearOption@(i)" value="@i" onclick="setEffectiveDate(@i)" @(i == 1 ? "checked" : "") />
+                                                                    <label class="btn btn-outline-primary w-100 mb-0 py-1 fs-7" for="yearOption@(i)">@i Year@(i > 1 ? "s" : "")</label>
+                                                                </div>
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Applicable Areas -->
+                                <div class="col-12">
+                                    <div class="card border-0 shadow-sm mb-3">
+                                        <div class="card-header bg-primary text-white py-2">
+                                            <h6 class="mb-0 d-flex align-items-center">
+                                                <i class="fas fa-map-marker-alt me-2 fs-6"></i>Applicable Areas <span class="text-danger ms-1">*</span>
+                                            </h6>
+                                        </div>
+                                        <div class="card-body p-3">
+                                            <div class="row g-2" id="areaCheckboxGroup">
+                                                @if (ViewData["Areas"] != null)
+                                                {
+                                                    foreach (var areaName in (List<string>)ViewData["Areas"])
+                                                    {
+                                                        <div class="col-6 col-sm-4 col-md-3 col-lg-2">
+                                                            <div class="form-check card-checkbox p-0">
+                                                                <input class="form-check-input area-checkbox" type="checkbox" name="Area" id="area_@areaName" value="@areaName" checked="@(docAreas.Contains(areaName))" />
+                                                                <label class="form-check-label w-100 h-100 p-2 border rounded-2 fs-7" for="area_@areaName">
+                                                                    <div class="d-flex align-items-center">
+                                                                        <div class="checkbox-icon me-1"><i class="fas fa-map-pin fs-7"></i></div>
+                                                                        <span class="text-truncate">@areaName</span>
+                                                                    </div>
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                    }
+                                                }
+                                            </div>
+                                            <span class="text-danger mt-2 d-none d-flex align-items-center fs-7" id="areaError">
+                                                <i class="fas fa-exclamation-circle me-1 fs-7"></i>Please select at least one area
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="d-grid">
+                                        <button type="submit" class="btn btn-warning text-dark py-2 shadow-sm">
+                                            <i class="fas fa-sync-alt me-2"></i>Replace Document
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </main>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+}
+else
+{
+    <div class="alert alert-info">
+        <i class="fas fa-sign-in-alt me-2"></i>Please <a asp-controller="Account" asp-action="Login">login</a> to access this page.
+    </div>
+}
+
+@section Scripts {
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            initReplaceForm();
+            // Set effective date from last review + selected year option on load
+            var lastReview = document.querySelector("input[name='lastReviewDate']");
+            if (lastReview && lastReview.value) {
+                var opt = document.querySelector('input[name="yearOption"]:checked');
+                if (opt) setEffectiveDate(parseInt(opt.value));
+            }
+        });
+
+        function initReplaceForm() {
+            var form = document.getElementById("replaceForm");
+            if (!form) return;
+            var submitBtn = form.querySelector('button[type="submit"]');
+            var originalBtnHTML = submitBtn ? submitBtn.innerHTML : '';
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                if (!validateFileSelection(document.getElementById('originalFileInput'))) {
+                    return;
+                }
+                var checkboxes = document.querySelectorAll(".area-checkbox");
+                var areaChecked = Array.from(checkboxes).some(function (cb) { return cb.checked; });
+                var areaError = document.getElementById("areaError");
+                if (!areaChecked) {
+                    areaError.classList.remove("d-none");
+                    areaError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    return;
+                }
+                areaError.classList.add("d-none");
+                if (!form.checkValidity()) {
+                    form.classList.add('was-validated');
+                    return;
+                }
+                if (submitBtn) {
+                    submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Replacing...';
+                    submitBtn.disabled = true;
+                }
+                form.submit();
+            });
+        }
+
+        function updateFileName(inputId, displayId) {
+            var input = document.getElementById(inputId);
+            var display = document.getElementById(displayId);
+            if (input && input.files.length > 0) {
+                display.textContent = input.files[0].name;
+                display.classList.add('text-success');
+                display.classList.remove('text-muted');
+            } else if (display) {
+                display.textContent = '';
+            }
+        }
+
+        function setEffectiveDate(yearsToAdd) {
+            var lastReviewInput = document.querySelector("input[name='lastReviewDate']");
+            var effectiveDateInput = document.getElementById("effectiveDate");
+            if (!lastReviewInput || !lastReviewInput.value || !effectiveDateInput) return;
+            var lastReviewDate = new Date(lastReviewInput.value);
+            if (isNaN(lastReviewDate.getTime())) return;
+            lastReviewDate.setFullYear(lastReviewDate.getFullYear() + yearsToAdd);
+            effectiveDateInput.value = lastReviewDate.toISOString().split("T")[0];
+        }
+
+        function validateDate(input) {
+            var selectedDate = new Date(input.value);
+            var today = new Date();
+            if (selectedDate > today) {
+                input.setCustomValidity('Date cannot be in the future');
+                input.reportValidity();
+            } else {
+                input.setCustomValidity('');
+                var opt = document.querySelector('input[name="yearOption"]:checked');
+                if (opt) setEffectiveDate(parseInt(opt.value));
+            }
+        }
+
+        function validateFileSelection(input) {
+            var wrapper = input.closest('.file-upload-wrapper');
+            var fileNameDisplay = document.getElementById('originalFileName');
+            var errorDisplay = document.getElementById('originalFileError');
+            if (!wrapper || !errorDisplay) return false;
+            wrapper.classList.remove('is-invalid', 'is-valid');
+            errorDisplay.textContent = '';
+            if (input.files && input.files.length > 0) {
+                var file = input.files[0];
+                var fileExt = file.name.split('.').pop().toLowerCase();
+                var allowedExts = ['doc', 'docx', 'dot', 'dotx', 'xls', 'xlsx', 'xlt', 'xltx', 'ppt', 'pptx', 'pot', 'potx', 'pdf'];
+                if (!allowedExts.includes(fileExt)) {
+                    wrapper.classList.add('is-invalid');
+                    errorDisplay.textContent = 'Invalid file type. Please select a Word, Excel, or PDF file.';
+                    input.value = '';
+                    if (fileNameDisplay) fileNameDisplay.textContent = '';
+                    return false;
+                }
+                var maxSize = 100 * 1024 * 1024;
+                if (file.size > maxSize) {
+                    wrapper.classList.add('is-invalid');
+                    errorDisplay.textContent = 'File size exceeds 100MB limit.';
+                    input.value = '';
+                    if (fileNameDisplay) fileNameDisplay.textContent = '';
+                    return false;
+                }
+                wrapper.classList.add('is-valid');
+                if (fileNameDisplay) fileNameDisplay.textContent = file.name;
+                return true;
+            }
+            wrapper.classList.add('is-invalid');
+            errorDisplay.textContent = 'Please select a file.';
+            return false;
+        }
+    </script>
+}
+
+@section Styles {
+    <style>
+        .file-upload-card { padding: 0.75rem; border: 1px dashed #dee2e6; border-radius: 6px; background: white; }
+        .file-upload-wrapper { position: relative; min-height: 80px; cursor: pointer; }
+        .file-upload-input { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; z-index: 10; }
+        .file-upload-mask { position: relative; padding: 0.5rem; border: 2px dashed #dee2e6; border-radius: 5px; background: #f8f9fa; text-align: center; min-height: 80px; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 1; }
+        .file-upload-wrapper.is-valid .file-upload-mask { border-color: #198754; background-color: rgba(25, 135, 84, 0.05); }
+        .file-upload-wrapper.is-invalid .file-upload-mask { border-color: #dc3545; background-color: rgba(220, 53, 69, 0.05); }
+        .card-checkbox .form-check-input { display: none; }
+        .card-checkbox .form-check-label { display: block; padding: 0.5rem; border: 1px solid #dee2e6; border-radius: 4px; cursor: pointer; background: white; margin: 0; height: 100%; }
+        .card-checkbox .form-check-input:checked + .form-check-label { background: rgba(13, 110, 253, 0.1); border-color: #0d6efd; color: #0d6efd; }
+    </style>
+}

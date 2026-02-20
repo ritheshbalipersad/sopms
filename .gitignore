@@ -55,4 +55,7 @@ keys/
 .DS_Store
 Thumbs.db
 
+# Large archive/media files (exceed GitHub 100MB limit)
+wwwroot/archives/
+
 # Keep appsettings.json (template/sample) - ignore only local overrides above

@@ -67,6 +67,201 @@ namespace SOPMSApp.Controllers
             return View();
         }
 
+        /// <summary>Admin-only: show replace-document form (same as upload) pre-filled with existing document. New upload will archive current files and replace.</summary>
+        [HttpGet]
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> ReviewDocument(int id)
+        {
+            var doc = await _context.DocRegisters
+                .AsNoTracking()
+                .FirstOrDefaultAsync(d => d.Id == id && (d.IsArchived != true));
+
+            if (doc == null)
+            {
+                TempData["Error"] = "Document not found or is archived.";
+                return RedirectToAction("Index", "Meta");
+            }
+
+            var areas = await GetDistinctAreasAsync();
+            var departments = await GetDepartmentsAsync();
+            var documents = await GetDistinctDocumentsAsync();
+            ViewData["Areas"] = areas;
+            ViewData["Documents"] = documents;
+            ViewData["Department"] = departments;
+            ViewBag.UserDepartment = User.FindFirst("DepartmentID")?.Value;
+            ViewBag.DocumentTypes = new SelectList(documents);
+            ViewBag.IsReplace = true;
+            ViewBag.Document = doc;
+            ViewBag.NextRevision = IncrementRevisionForReplace(doc.Revision);
+            return View("ReviewDocument", doc);
+        }
+
+        /// <summary>Admin-only: replace existing document. Archives current original + PDF (and video) then saves new files. Full audit trail.</summary>
+        [HttpPost]
+        [Authorize(Roles = "Admin")]
+        [RequestSizeLimit(524_288_000)]
+        public async Task<IActionResult> ReplaceDocument(
+            int id,
+            IFormFile OriginalFile,
+            IFormFile? PdfFile,
+            IFormFile? VideoFile,
+            string sopNumber,
+            string author,
+            string department,
+            DateTime? lastReviewDate,
+            string docType,
+            DateTime? effectiveDate,
+            string documentType,
+            string[]? Area,
+            string revision)
+        {
+            var doc = await _context.DocRegisters.FirstOrDefaultAsync(d => d.Id == id && (d.IsArchived != true));
+            if (doc == null)
+            {
+                TempData["Error"] = "Document not found or is archived.";
+                return RedirectToAction("Index", "Meta");
+            }
+
+            if (OriginalFile == null || OriginalFile.Length == 0)
+            {
+                TempData["Error"] = "Original file is required to replace the document.";
+                return RedirectToAction(nameof(ReviewDocument), new { id });
+            }
+
+            var basePath = _configuration["StorageSettings:BasePath"];
+            if (string.IsNullOrEmpty(basePath))
+            {
+                TempData["Error"] = "Storage is not configured.";
+                return RedirectToAction(nameof(ReviewDocument), new { id });
+            }
+
+            var validDocTypes = await GetDistinctDocumentsAsync();
+            var matchedDocType = validDocTypes.FirstOrDefault(d => d.Equals(doc.DocType, StringComparison.OrdinalIgnoreCase));
+            if (string.IsNullOrEmpty(matchedDocType))
+                matchedDocType = doc.DocType;
+
+            var allowedOriginalExts = new[] { ".doc", ".docx", ".dot", ".dotx", ".xls", ".xlsx", ".xlt", ".xltx", ".ppt", ".pptx", ".pot", ".potx", ".pdf" };
+            var originalExt = Path.GetExtension(OriginalFile.FileName).ToLower();
+            if (!allowedOriginalExts.Contains(originalExt))
+            {
+                TempData["Error"] = "Invalid original file type.";
+                return RedirectToAction(nameof(ReviewDocument), new { id });
+            }
+            if (PdfFile != null && Path.GetExtension(PdfFile.FileName).ToLower() != ".pdf")
+            {
+                TempData["Error"] = "PDF file must have .pdf extension.";
+                return RedirectToAction(nameof(ReviewDocument), new { id });
+            }
+
+            var performedBy = User.FindFirst("LaborName")?.Value ?? User.Identity?.Name ?? "System";
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var archiveSubDir = $"{doc.SopNumber}_Replaced_{timestamp}";
+            var archiveDir = Path.Combine(basePath, "Archive", "Replaced", archiveSubDir);
+            Directory.CreateDirectory(archiveDir);
+
+            var originalsBase = Path.Combine(basePath, "Originals", matchedDocType);
+            var pdfBase = Path.Combine(basePath, "PDFs", matchedDocType);
+            var videosBase = Path.Combine(basePath, "Videos", matchedDocType);
+
+            if (!string.IsNullOrWhiteSpace(doc.OriginalFile))
+            {
+                var oldOriginalPath = Path.Combine(originalsBase, doc.OriginalFile);
+                if (System.IO.File.Exists(oldOriginalPath))
+                {
+                    var archiveName = $"{timestamp}_{doc.OriginalFile}";
+                    System.IO.File.Move(oldOriginalPath, Path.Combine(archiveDir, archiveName));
+                    _logger.LogInformation("Archived original to {Path}", Path.Combine(archiveDir, archiveName));
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(doc.FileName) && doc.FileName != "N/A")
+            {
+                var oldPdfPath = Path.Combine(pdfBase, doc.FileName);
+                if (System.IO.File.Exists(oldPdfPath))
+                {
+                    var archiveName = $"{timestamp}_{doc.FileName}";
+                    System.IO.File.Move(oldPdfPath, Path.Combine(archiveDir, archiveName));
+                    _logger.LogInformation("Archived PDF to {Path}", Path.Combine(archiveDir, archiveName));
+                }
+            }
+
+            if (!string.IsNullOrWhiteSpace(doc.VideoPath))
+            {
+                var videoFileName = Path.GetFileName(doc.VideoPath);
+                var oldVideoPath = Path.Combine(videosBase, videoFileName);
+                if (System.IO.File.Exists(oldVideoPath))
+                {
+                    var archiveName = $"{timestamp}_{videoFileName}";
+                    System.IO.File.Move(oldVideoPath, Path.Combine(archiveDir, archiveName));
+                    _logger.LogInformation("Archived video to {Path}", Path.Combine(archiveDir, archiveName));
+                }
+            }
+
+            var newOriginalFileName = Path.GetFileName(OriginalFile.FileName);
+            var newOriginalPath = Path.Combine(originalsBase, newOriginalFileName);
+            Directory.CreateDirectory(originalsBase);
+            using (var stream = new FileStream(newOriginalPath, FileMode.Create))
+                await OriginalFile.CopyToAsync(stream);
+
+            string? newPdfFileName = null;
+            if (PdfFile != null && PdfFile.Length > 0)
+            {
+                newPdfFileName = Path.GetFileName(PdfFile.FileName);
+                Directory.CreateDirectory(pdfBase);
+                var newPdfPath = Path.Combine(pdfBase, newPdfFileName);
+                using (var stream = new FileStream(newPdfPath, FileMode.Create))
+                    await PdfFile.CopyToAsync(stream);
+            }
+
+            string? newVideoPath = null;
+            if (VideoFile != null && VideoFile.Length > 0)
+            {
+                var newVideoFileName = Path.GetFileName(VideoFile.FileName);
+                Directory.CreateDirectory(videosBase);
+                var videoFullPath = Path.Combine(videosBase, newVideoFileName);
+                using (var stream = new FileStream(videoFullPath, FileMode.Create))
+                    await VideoFile.CopyToAsync(stream);
+                newVideoPath = Path.Combine("Videos", matchedDocType, newVideoFileName).Replace("\\", "/");
+            }
+
+            doc.OriginalFile = newOriginalFileName;
+            doc.FileName = newPdfFileName ?? "N/A";
+            doc.VideoPath = newVideoPath ?? doc.VideoPath;
+            doc.FileSize = OriginalFile.Length + (PdfFile?.Length ?? 0) + (VideoFile?.Length ?? 0);
+            doc.ContentType = PdfFile != null ? "application/pdf" : GetContentType(originalExt);
+            doc.Author = performedBy;
+            doc.LastReviewDate = DateTime.Now;
+            doc.EffectiveDate = effectiveDate ?? doc.EffectiveDate;
+            doc.DocumentType = documentType ?? doc.DocumentType;
+            doc.Area = Area != null && Area.Length > 0 ? string.Join(", ", Area) : doc.Area;
+            doc.Revision = !string.IsNullOrWhiteSpace(revision) ? revision : IncrementRevisionForReplace(doc.Revision);
+            doc.Status = "Pending Approval";
+            doc.ReviewedBy = "Pending";
+            doc.UploadDate = DateTime.Now;
+
+            _context.DocRegisters.Update(doc);
+            await _context.SaveChangesAsync();
+
+            var details = $"Previous version archived to Archive/Replaced/{archiveSubDir}. New files: {newOriginalFileName}" + (newPdfFileName != null ? $", {newPdfFileName}" : "");
+            await _auditLog.LogAsync(doc.Id, doc.SopNumber ?? "", "Replaced", performedBy, details, doc.OriginalFile);
+
+            TempData["Success"] = $"Document {doc.SopNumber} has been replaced. Previous version was archived.";
+            return RedirectToAction("Index", "Meta");
+        }
+
+        private static string IncrementRevisionForReplace(string? currentRevision)
+        {
+            if (string.IsNullOrWhiteSpace(currentRevision)) return "Rev: 1";
+            if (currentRevision.StartsWith("Rev:", StringComparison.OrdinalIgnoreCase))
+            {
+                var rest = currentRevision.Substring(4).Trim();
+                if (int.TryParse(rest, out int rev)) return $"Rev: {rev + 1}";
+            }
+            var digits = new string((currentRevision ?? "").Where(char.IsDigit).ToArray());
+            if (int.TryParse(digits, out int n)) return $"Rev: {n + 1}";
+            return "Rev: 1";
+        }
+
         [HttpGet]
         public async Task<IActionResult> GetSopNumber(string docType)
         {
