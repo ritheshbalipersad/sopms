@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using SOPMSApp.Controllers;
 
@@ -74,62 +74,124 @@ public class FileAccessController : Controller
         if (string.IsNullOrWhiteSpace(fileName))
             return NotFound("File name missing.");
 
-        var safeFile = Path.GetFileNameWithoutExtension(fileName);
-        if (string.IsNullOrEmpty(safeFile))
+        var safeFile = Path.GetFileName(fileName);
+        var baseNoExt = Path.GetFileNameWithoutExtension(safeFile);
+        if (string.IsNullOrEmpty(baseNoExt))
             return NotFound("File name is invalid.");
 
-        // Always expect PDF
-        var targetPdf = safeFile + ".pdf";
+        var targetPdf = safeFile.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? safeFile : baseNoExt + ".pdf";
 
         var basePath = _storageSettings.BasePath;
         if (string.IsNullOrEmpty(basePath))
             return StatusCode(500, "Storage base path missing.");
 
-        // Build all primary search roots
-        var searchRoots = new List<string>
-        {
-            Path.Combine(basePath, "PDFs"),
-            Path.Combine(basePath, "Uploads"),
-            Path.Combine(basePath, "Originals")
-        };
-
-        // If docType is provided, search inside Originals/{docType} first
-        if (!string.IsNullOrEmpty(docType))
-        {
-            var typedFolder = Path.Combine(basePath, "Originals", docType);
-            searchRoots.Insert(0, typedFolder);
-        }
-
         string foundFile = null;
 
-        foreach (var root in searchRoots.Distinct())
+        bool MatchPdf(string fullPath)
         {
-            if (!Directory.Exists(root))
-                continue;
+            var name = Path.GetFileName(fullPath);
+            var nameNoExt = Path.GetFileNameWithoutExtension(fullPath);
+            return name.Equals(targetPdf, StringComparison.OrdinalIgnoreCase) ||
+                   nameNoExt.Equals(baseNoExt, StringComparison.OrdinalIgnoreCase);
+        }
 
-            // Search ANYWHERE under this root
-            var files = Directory.GetFiles(root, "*.pdf", SearchOption.AllDirectories);
-
-            foundFile = files.FirstOrDefault(f =>
-                Path.GetFileName(f).Equals(targetPdf, StringComparison.OrdinalIgnoreCase) ||
-                Path.GetFileNameWithoutExtension(f).Equals(safeFile, StringComparison.OrdinalIgnoreCase)
-            );
-
-            if (foundFile != null)
-                break;
+        if (!string.IsNullOrWhiteSpace(docType))
+        {
+            var pdfInDocType = Path.Combine(basePath, "PDFs", docType, targetPdf);
+            if (System.IO.File.Exists(pdfInDocType))
+                foundFile = pdfInDocType;
+            if (foundFile == null)
+            {
+                var basePdfInDocType = Path.Combine(basePath, "PDFs", docType, baseNoExt + ".pdf");
+                if (System.IO.File.Exists(basePdfInDocType))
+                    foundFile = basePdfInDocType;
+            }
+            if (foundFile == null)
+            {
+                var originalPdfInDocType = Path.Combine(basePath, "Originals", docType, targetPdf);
+                if (System.IO.File.Exists(originalPdfInDocType))
+                    foundFile = originalPdfInDocType;
+            }
         }
 
         if (foundFile == null)
         {
-            _logger.LogWarning($"PDF '{targetPdf}' not found. Roots: {string.Join(", ", searchRoots)}");
-            return NotFound($"PDF '{fileName}' was not found in the storage system.");
+            var pdfRoot = Path.Combine(basePath, "PDFs");
+            if (Directory.Exists(pdfRoot))
+            {
+                var pdfs = Directory.GetFiles(pdfRoot, "*.pdf", SearchOption.AllDirectories);
+                foundFile = pdfs.FirstOrDefault(f => MatchPdf(f));
+            }
         }
 
-        var fileStream = new FileStream(foundFile, FileMode.Open, FileAccess.Read);
-        return new FileStreamResult(fileStream, "application/pdf")
+        if (foundFile == null)
         {
-            FileDownloadName = null
-        };
+            var uploads = Path.Combine(basePath, "Uploads");
+            if (Directory.Exists(uploads))
+            {
+                var pdfs = Directory.GetFiles(uploads, "*.pdf", SearchOption.AllDirectories);
+                foundFile = pdfs.FirstOrDefault(f => MatchPdf(f));
+            }
+        }
+
+        if (foundFile == null)
+        {
+            var originalsRoot = Path.Combine(basePath, "Originals");
+            if (Directory.Exists(originalsRoot))
+            {
+                var pdfs = Directory.GetFiles(originalsRoot, "*.pdf", SearchOption.AllDirectories);
+                foundFile = pdfs.FirstOrDefault(f => MatchPdf(f));
+            }
+        }
+
+        if (foundFile == null && _hostingEnvironment?.WebRootPath != null)
+        {
+            var webRootPaths = new[]
+            {
+                Path.Combine(_hostingEnvironment.WebRootPath, "Documents", "PDFs"),
+                Path.Combine(_hostingEnvironment.WebRootPath, "Documents", "Uploads"),
+                Path.Combine(_hostingEnvironment.WebRootPath, "Documents", "Originals"),
+                Path.Combine(_hostingEnvironment.WebRootPath, "PDFs"),
+                Path.Combine(_hostingEnvironment.WebRootPath, "upload")
+            };
+            if (!string.IsNullOrWhiteSpace(docType))
+            {
+                var withDocType = Path.Combine(_hostingEnvironment.WebRootPath, "Documents", "PDFs", docType);
+                if (Directory.Exists(withDocType))
+                {
+                    var direct = Path.Combine(withDocType, targetPdf);
+                    if (System.IO.File.Exists(direct)) foundFile = direct;
+                }
+                if (foundFile == null)
+                {
+                    var origDocType = Path.Combine(_hostingEnvironment.WebRootPath, "Documents", "Originals", docType);
+                    if (Directory.Exists(origDocType))
+                    {
+                        var direct = Path.Combine(origDocType, targetPdf);
+                        if (System.IO.File.Exists(direct)) foundFile = direct;
+                    }
+                }
+            }
+            foreach (var dir in webRootPaths)
+            {
+                if (foundFile != null) break;
+                if (!Directory.Exists(dir)) continue;
+                var pdfs = Directory.GetFiles(dir, "*.pdf", SearchOption.AllDirectories);
+                foundFile = pdfs.FirstOrDefault(f => MatchPdf(f));
+            }
+        }
+
+        if (foundFile == null)
+        {
+            _logger.LogWarning("PDF '{Target}' not found. BasePath: {BasePath}, DocType: {DocType}", targetPdf, basePath, docType ?? "(none)");
+            return NotFound("PDF was not found in the storage system.");
+        }
+
+        Response.Headers["Content-Disposition"] = "inline";
+        Response.Headers["X-Content-Type-Options"] = "nosniff";
+        Response.Headers["X-Frame-Options"] = "SAMEORIGIN";
+        var fileStream = new FileStream(foundFile, FileMode.Open, FileAccess.Read, FileShare.Read);
+        return new FileStreamResult(fileStream, "application/pdf");
     }
 
 

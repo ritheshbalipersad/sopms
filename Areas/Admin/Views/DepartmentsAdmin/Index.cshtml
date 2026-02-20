@@ -1,0 +1,61 @@
+@model List<SOPMSApp.Areas.Admin.Controllers.DepartmentAdminItem>
+@{
+    ViewData["Title"] = "Manage Departments";
+    var activeOnly = ViewContext.HttpContext.Request.Query["activeOnly"].FirstOrDefault() ?? "True";
+}
+
+<div class="container-fluid py-4">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+        <h2><i class="fas fa-building me-2"></i>Departments</h2>
+        <div class="d-flex gap-2 align-items-center">
+            <a asp-area="Admin" asp-controller="DepartmentsAdmin" asp-action="Index" asp-route-activeOnly="True" class="btn @(activeOnly == "True" ? "btn-primary" : "btn-outline-primary") btn-sm">Active only</a>
+            <a asp-area="Admin" asp-controller="DepartmentsAdmin" asp-action="Index" asp-route-activeOnly="False" class="btn @(activeOnly == "False" ? "btn-primary" : "btn-outline-primary") btn-sm">All</a>
+            <a asp-area="Admin" asp-controller="DepartmentsAdmin" asp-action="Create" class="btn btn-success btn-sm"><i class="fas fa-plus me-1"></i> Add Department</a>
+        </div>
+    </div>
+
+    @if (TempData["Success"] != null)
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">@TempData["Success"]<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+    }
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            @if (Model.Count == 0)
+            {
+                <p class="text-muted mb-0">No departments found. <a asp-area="Admin" asp-controller="DepartmentsAdmin" asp-action="Create">Add one</a>.</p>
+            }
+            else
+            {
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Supervisor</th>
+                            <th>Active</th>
+                            <th width="100">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var item in Model)
+                        {
+                            <tr>
+                                <td>@item.DepartmentID</td>
+                                <td>@item.DepartmentName</td>
+                                <td>@(item.SupervisorName ?? "—")</td>
+                                <td>@(item.Active ? "Yes" : "No")</td>
+                                <td>
+                                    <a asp-area="Admin" asp-controller="DepartmentsAdmin" asp-action="Edit" asp-route-id="@item.DepartmentID" class="btn btn-sm btn-outline-primary">Edit</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+        </div>
+    </div>
+    <p class="mt-3">
+        <a asp-area="Admin" asp-controller="Admin" asp-action="Index"><i class="fas fa-arrow-left me-1"></i>Back to Administration</a>
+    </p>
+</div>

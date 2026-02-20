@@ -1,4 +1,5 @@
-﻿using SOPMSApp.Data;
+using Microsoft.AspNetCore.Hosting;
+using SOPMSApp.Data;
 using SOPMSApp.Models;
 
 namespace SOPMSApp.Services
@@ -7,16 +8,27 @@ namespace SOPMSApp.Services
     {
         private readonly ApplicationDbContext _context;
         private readonly IConfiguration _config;
+        private readonly IWebHostEnvironment _env;
         private readonly ILogger<FilePermanentDeleteService> _logger;
 
         public FilePermanentDeleteService(
             ApplicationDbContext context,
             IConfiguration config,
-            ILogger<FilePermanentDeleteService> logger)
+            ILogger<FilePermanentDeleteService> logger,
+            IWebHostEnvironment env)
         {
             _context = context;
             _config = config;
             _logger = logger;
+            _env = env;
+        }
+
+        private string GetArchiveRootPath()
+        {
+            var basePath = _config["StorageSettings:BasePath"];
+            if (!string.IsNullOrEmpty(basePath))
+                return Path.Combine(basePath, "Archive", "Deleted");
+            return Path.Combine(_env.WebRootPath, "Archive", "Deleted");
         }
 
         public async Task PermanentlyDeleteAsync(DeletedFileLog deletedLog)
@@ -43,14 +55,7 @@ namespace SOPMSApp.Services
 
         private void DeleteArchivedFiles(DeletedFileLog deletedLog)
         {
-            // Get base path from configuration
-            var basePath = _config["StorageSettings:BasePath"];
-            if (string.IsNullOrEmpty(basePath))
-            {
-                throw new InvalidOperationException("StorageSettings:BasePath is not configured.");
-            }
-
-            var archiveRoot = Path.Combine(basePath, "Archive", "Deleted");
+            var archiveRoot = GetArchiveRootPath();
 
             // Delete PDF file
             if (!string.IsNullOrEmpty(deletedLog.FileName))

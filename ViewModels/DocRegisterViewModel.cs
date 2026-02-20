@@ -1,4 +1,4 @@
-﻿using SOPMSApp.Models;
+using SOPMSApp.Models;
 
 namespace SOPMSApp.Models // or SOPMSApp.ViewModels if you prefer
 {
@@ -11,6 +11,8 @@ namespace SOPMSApp.Models // or SOPMSApp.ViewModels if you prefer
         public string VideoUrl { get; set; }
         public string OtherFileUrl { get; set; }
         public string DownloadUrl { get; set; }
+        /// <summary>URL to download the original uploaded file (from Originals folder).</summary>
+        public string OriginalDownloadUrl { get; set; }
         public string StatusClass { get; set; }
     }
 

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
@@ -577,7 +577,7 @@
                                 </div>
                             </li>
                             <li class="nav-item">
-                                <form asp-controller="Account" asp-action="Logout" method="post" id="logoutForm" class="d-inline">
+                                <form asp-area="" asp-controller="Account" asp-action="Logout" method="post" id="logoutForm" class="d-inline">
                                     <button type="submit" class="btn btn-outline-light">
                                         <i class="fas fa-sign-out-alt me-2"></i> Logout
                                     </button>
@@ -589,7 +589,7 @@
                     {
                         <ul class="navbar-nav ms-auto align-items-center">
                             <li class="nav-item">
-                                <a asp-controller="Account" asp-action="Login" class="btn btn-login">
+                                <a asp-area="" asp-controller="Account" asp-action="Login" class="btn btn-login">
                                     <i class="fas fa-sign-in-alt me-2"></i> LOGIN
                                 </a>
                             </li>
@@ -619,7 +619,7 @@
                         </h5>
                         <ul class="sidebar-menu">
                             <li>
-                                <a asp-controller="Home" asp-action="Index" class="hover-lift">
+                                <a asp-area="" asp-controller="Home" asp-action="Index" class="hover-lift">
                                     <i class="fas fa-home me-2"></i> 
                                     @(User.IsInRole("Manager") || User.IsInRole("Admin") ? "Return Home" : "Home")
                                 </a>
@@ -636,13 +636,13 @@
                             </h5>
                             <ul class="sidebar-menu">
                                 <li class="sidebar-menu-item">
-                                    <a asp-controller="SopArea" asp-action="Index" class="d-flex justify-content-between align-items-center hover-lift">
+                                    <a asp-area="" asp-controller="SopArea" asp-action="Index" class="d-flex justify-content-between align-items-center hover-lift">
                                         <span><i class="fas fa-map-marked-alt me-2"></i> Area View</span>
                                         <i class="fas fa-chevron-right small"></i>
                                     </a>
                                 </li>
                                 <li class="sidebar-menu-item">
-                                    <a asp-controller="SopDept" asp-action="Index" class="d-flex justify-content-between align-items-center hover-lift">
+                                    <a asp-area="" asp-controller="SopDept" asp-action="Index" class="d-flex justify-content-between align-items-center hover-lift">
                                         <span><i class="fas fa-building me-2"></i> Department View</span>
                                         <i class="fas fa-chevron-right small"></i>
                                     </a>
@@ -659,7 +659,7 @@
                                 </h5>
                                 <ul class="sidebar-menu">
                                     <li class="sidebar-menu-item">
-                                        <a asp-controller="Approvals" asp-action="Approvals" class="d-flex justify-content-between align-items-center hover-lift">
+                                        <a asp-area="" asp-controller="Approvals" asp-action="Approvals" class="d-flex justify-content-between align-items-center hover-lift">
                                             <span><i class="fas fa-inbox me-2"></i> Approval Queue</span>
                                             <span id="pendingBadge" class="badge bg-warning text-dark badge-notification" style="display: none;"></span>
                                         </a>
@@ -668,8 +668,14 @@
                                     @if (User.IsInRole("Admin"))
                                     {
                                         <li class="sidebar-menu-item">
-                                            <a asp-controller="DeletedFiles" asp-action="Index" class="d-flex justify-content-between align-items-center hover-lift">
+                                            <a asp-area="" asp-controller="DeletedFiles" asp-action="Index" class="d-flex justify-content-between align-items-center hover-lift">
                                                 <span><i class="fas fa-trash-restore me-2"></i> Document Archives</span>
+                                                <i class="fas fa-chevron-right small"></i>
+                                            </a>
+                                        </li>
+                                        <li class="sidebar-menu-item">
+                                            <a asp-area="Admin" asp-controller="Admin" asp-action="Index" class="d-flex justify-content-between align-items-center hover-lift">
+                                                <span><i class="fas fa-cog me-2"></i> Administration</span>
                                                 <i class="fas fa-chevron-right small"></i>
                                             </a>
                                         </li>
@@ -685,12 +691,12 @@
                                 </h5>
                                 <ul class="sidebar-menu">
                                     <li>
-                                        <a asp-controller="StructuredSop" asp-action="Create" class="nav-link d-flex align-items-center hover-lift">
+                                        <a asp-area="" asp-controller="StructuredSop" asp-action="Create" class="nav-link d-flex align-items-center hover-lift">
                                             <i class="fas fa-file-upload me-2 text-info"></i> Create Structured Document
                                         </a>
                                     </li>
                                     <li>
-                                        <a asp-controller="StructuredSop" asp-action="Index" class="d-flex align-items-center hover-lift">
+                                        <a asp-area="" asp-controller="StructuredSop" asp-action="Index" class="d-flex align-items-center hover-lift">
                                             <i class="fas fa-clock me-2"></i> Review Structured Documents
                                         </a>
                                     </li>
@@ -704,30 +710,30 @@
                             </h5>
                             <ul class="sidebar-menu">
                                 <li>
-                                    <a asp-controller="FileUpload" asp-action="Index" class="nav-link d-flex align-items-center upload-trigger hover-lift">
+                                    <a asp-area="" asp-controller="FileUpload" asp-action="Index" class="nav-link d-flex align-items-center upload-trigger hover-lift">
                                         <i class="fas fa-file-upload me-2 text-info"></i> Upload New Document
                                     </a>
                                 </li>
                                 <li>
-                                    <a asp-controller="FileUpload" asp-action="UploadVideo" class="nav-link d-flex align-items-center hover-lift">
+                                    <a asp-area="" asp-controller="FileUpload" asp-action="UploadVideo" class="nav-link d-flex align-items-center hover-lift">
                                         <i class="fas fa-file-video me-2 text-success"></i> Upload New Video
                                     </a>
                                 </li>
                                 <li>
-                                    <a asp-controller="Meta" asp-action="Index" class="nav-link d-flex align-items-center hover-lift">
+                                    <a asp-area="" asp-controller="Meta" asp-action="Index" class="nav-link d-flex align-items-center hover-lift">
                                         <i class="fas fa-table me-2"></i> Master Table
                                     </a>
                                 </li>
                                 @if (User.IsInRole("Admin"))
                                 {
                                    <li>
-                                        <a asp-controller="FileUpload" asp-action="BulkUpload" class="nav-link d-flex align-items-center upload-trigger hover-lift">
+                                        <a asp-area="" asp-controller="FileUpload" asp-action="BulkUpload" class="nav-link d-flex align-items-center upload-trigger hover-lift">
                                             <i class="fas fa-file-excel me-2 text-success"></i> Batch Upload
                                         </a>
                                     </li>
                                 }
                                 <li>
-                                    <a asp-controller="Revision" asp-action="Index" class="d-flex align-items-center hover-lift">
+                                    <a asp-area="" asp-controller="Revision" asp-action="Index" class="d-flex align-items-center hover-lift">
                                        <i class="fas fa-clock me-2"></i> Document Revision
                                     </a>
                                 </li>
@@ -744,7 +750,7 @@
                         </h5>
                         <ul class="sidebar-menu">
                             <li>
-                                <a asp-controller="Home" asp-action="Index" class="hover-lift">
+                                <a asp-area="" asp-controller="Home" asp-action="Index" class="hover-lift">
                                     <i class="fas fa-home me-2"></i> Home
                                 </a>
                             </li>
@@ -757,7 +763,7 @@
                         </h5>
                         <ul class="sidebar-menu">
                             <li>
-                                <a asp-controller="SopArea" asp-action="Index" class="hover-lift">
+                                <a asp-area="" asp-controller="SopArea" asp-action="Index" class="hover-lift">
                                     <i class="fas fa-shield-alt me-2"></i> Area View
                                 </a>
                             </li>
@@ -770,7 +776,7 @@
                         </h5>
                         <ul class="sidebar-menu">
                             <li>
-                                <a asp-controller="SopDept" asp-action="Index" class="hover-lift">
+                                <a asp-area="" asp-controller="SopDept" asp-action="Index" class="hover-lift">
                                     <i class="fas fa-shield-alt me-2"></i> Department View
                                 </a>
                             </li>
@@ -830,7 +836,7 @@
         <div class="container text-center">
             <small class="text-light d-block">
                 &copy; 2025 — <strong class="text-white">SOPMSApp Vision 2.10.2</strong> |
-                <a asp-controller="Home" asp-action="Infor" class="text-decoration-none text-info hover-lift">
+                <a asp-area="" asp-controller="Home" asp-action="Infor" class="text-decoration-none text-info hover-lift">
                     <i class="fas fa-info-circle me-1"></i>SOP MS Information
                 </a>
             </small>

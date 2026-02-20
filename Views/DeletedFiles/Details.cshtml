@@ -1,22 +1,20 @@
-﻿@model SOPMSApp.Models.DeletedFileLog
+@model SOPMSApp.Models.DeletedFileLog
 
 @{
     ViewData["Title"] = "Deleted Document Details";
 
-    // ✅ Get the actual file name
-    string displayFile = !string.IsNullOrWhiteSpace(Model.FileName) && Model.FileName != "N/A"
-        ? Model.FileName
-        : null;
+    // Use controller-resolved values when available (file found in archive); otherwise fall back to model
+    string displayFile = ViewBag.DisplayFileName as string ?? (Model.FileName != "N/A" ? Model.FileName : null) ?? Model.OriginalFileName;
+    bool isPdf = ViewBag.IsPdf as bool? ?? (displayFile != null && System.IO.Path.GetExtension(displayFile).Equals(".pdf", StringComparison.OrdinalIgnoreCase));
+    // Serve URL streams file from actual archive path (works when archive is outside wwwroot)
+    string fileUrl = null;
+    string serveUrl = null;
+    if (ViewBag.FileUrl != null)
+    {
+        serveUrl = Url.Action("ServeArchivedFile", "DeletedFiles", new { id = Model.Id, download = false });
+        fileUrl = serveUrl;
+    }
 
-    // ✅ Fix the file URL path to include /sop/ + your correct folder
-    string fileUrl = !string.IsNullOrWhiteSpace(displayFile)
-        ? Url.Content($"~/Archive/Deleted/PDFs/{displayFile}")
-        : null;
-
-    bool isPdf = !string.IsNullOrWhiteSpace(displayFile) &&
-                System.IO.Path.GetExtension(displayFile).Equals(".pdf", StringComparison.OrdinalIgnoreCase);
-
-    // ✅ Enhanced file type detection
     var fileType = "Document";
     var fileIcon = "bi-file-earmark-text";
     var fileBadge = "bg-secondary-light text-secondary";
@@ -176,29 +174,45 @@
                         }
                         else if (isPdf)
                         {
-                            <div class="pdf-preview-container text-center p-4">
-                                <div class="file-icon mb-3">
-                                    <i class="bi @fileIcon text-danger fs-1"></i>
-                                </div>
-
-                                <h5>@fileType</h5>
-                                <p class="text-muted mb-3">
+                            var pdfPreviewUrl = Url.Action("ServeArchivedPdf", "DeletedFiles", new { id = Model.Id });
+                            var downloadPdfUrl = Url.Action("ServeArchivedPdf", "DeletedFiles", new { id = Model.Id, download = true });
+                            var downloadOriginalUrl = Url.Action("ServeArchivedOriginal", "DeletedFiles", new { id = Model.Id, download = true });
+                            var hasPdf = ViewBag.HasPdf as bool? ?? true;
+                            var hasOriginal = ViewBag.HasOriginal as bool? ?? false;
+                            <div class="pdf-preview-container">
+                                <h5 class="mb-2">@fileType</h5>
+                                <p class="text-muted mb-2">
                                     @displayFile
                                     <span class="badge @fileBadge ms-2">PDF Archive</span>
                                 </p>
-
-                                <div class="d-flex justify-content-center gap-2">
-                                    <a href="@fileUrl" class="btn btn-outline-danger" >
-                                        <i class="bi bi-eye me-2"></i>View PDF
+                                <div class="d-flex justify-content-center flex-wrap gap-2 mb-3">
+                                    <a href="@pdfPreviewUrl" target="_blank" rel="noopener" class="btn btn-outline-danger">
+                                        <i class="bi bi-eye me-2"></i>View in new tab
                                     </a>
-                                    <a href="@fileUrl" class="btn btn-outline-secondary" download>
-                                        <i class="bi bi-download me-2"></i>Download
-                                    </a>
+                                    @if (hasPdf)
+                                    {
+                                        <a href="@downloadPdfUrl" class="btn btn-outline-secondary">
+                                            <i class="bi bi-file-pdf me-2"></i>Download PDF
+                                        </a>
+                                    }
+                                    @if (hasOriginal)
+                                    {
+                                        <a href="@downloadOriginalUrl" class="btn btn-outline-secondary">
+                                            <i class="bi bi-file-earmark-arrow-down me-2"></i>Download original file
+                                        </a>
+                                    }
+                                </div>
+                                <div class="pdf-embed-wrapper border rounded bg-light">
+                                    <iframe src="@pdfPreviewUrl" title="PDF preview: @displayFile" class="pdf-embed-iframe"></iframe>
                                 </div>
                             </div>
                         }
                         else
                         {
+                            var downloadPdfUrlOther = Url.Action("ServeArchivedPdf", "DeletedFiles", new { id = Model.Id, download = true });
+                            var downloadOriginalUrlOther = Url.Action("ServeArchivedOriginal", "DeletedFiles", new { id = Model.Id, download = true });
+                            var hasPdfOther = ViewBag.HasPdf as bool? ?? false;
+                            var hasOriginalOther = ViewBag.HasOriginal as bool? ?? true;
                             <div class="file-preview-container text-center p-4">
                                 <div class="file-icon mb-3">
                                     <i class="bi @fileIcon fs-1"></i>
@@ -207,15 +221,22 @@
                                 <h5>@fileType</h5>
                                 <p class="text-muted mb-3">
                                     @displayFile
-                                    <span class="badge @fileBadge ms-2">
-                                        @(fileUrl.Contains("/Originals/") ? "Original File" : "Archived File")
-                                    </span>
+                                    <span class="badge @fileBadge ms-2">Archived File</span>
                                 </p>
 
-                                <div class="d-flex justify-content-center gap-2">
-                                    <a href="@fileUrl" class="btn btn-primary" download>
-                                        <i class="bi bi-download me-2"></i>Download
-                                    </a>
+                                <div class="d-flex justify-content-center flex-wrap gap-2">
+                                    @if (hasPdfOther)
+                                    {
+                                        <a href="@downloadPdfUrlOther" class="btn btn-outline-danger">
+                                            <i class="bi bi-file-pdf me-2"></i>Download PDF
+                                        </a>
+                                    }
+                                    @if (hasOriginalOther)
+                                    {
+                                        <a href="@downloadOriginalUrlOther" class="btn btn-primary">
+                                            <i class="bi bi-file-earmark-arrow-down me-2"></i>Download original file
+                                        </a>
+                                    }
                                     @if (previewAvailable)
                                     {
                                         <a href="@fileUrl" class="btn btn-outline-secondary" target="_blank">
@@ -240,7 +261,16 @@
             <!-- Admin Actions -->
             @if (User.IsInRole("Admin"))
             {
-                <div class="d-flex justify-content-end mt-4 border-top pt-3">
+                <div class="d-flex justify-content-end gap-2 mt-4 border-top pt-3">
+                    @if (ViewBag.CanRestore == true)
+                    {
+                        <form asp-action="RestoreDocument" asp-route-id="@Model.Id" method="post" class="d-inline">
+                            @Html.AntiForgeryToken()
+                            <button type="submit" class="btn btn-success" onclick="return confirm('Restore this document back to active documents?');">
+                                <i class="bi bi-arrow-counterclockwise me-2"></i>Restore Document
+                            </button>
+                        </form>
+                    }
                     <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#permanentDeleteModal">
                         <i class="bi bi-trash3 me-2"></i>Permanent Delete Record
                     </button>
@@ -300,7 +330,7 @@
                     <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
                         <i class="bi bi-x-circle me-1"></i>Cancel
                     </button>
-                    <form asp-action="PermanentDelete" asp-route-id="@Model.Id" method="post">
+                    <form asp-action="DeletePermanent" asp-route-id="@Model.Id" method="post">
                         @Html.AntiForgeryToken()
                         <button type="submit" class="btn btn-danger">
                             <i class="bi bi-trash3-fill me-1"></i>Delete Record
@@ -321,8 +351,21 @@
 
     /* PDF Preview Styles */
     .pdf-preview-container {
-        max-width: 400px;
+        max-width: 100%;
         margin: 0 auto;
+    }
+
+    .pdf-embed-wrapper {
+        width: 100%;
+        min-height: 70vh;
+        overflow: hidden;
+    }
+
+    .pdf-embed-iframe {
+        width: 100%;
+        height: 70vh;
+        min-height: 500px;
+        border: none;
     }
 
     /* Generic File Preview Styles */

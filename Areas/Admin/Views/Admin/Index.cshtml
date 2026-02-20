@@ -1,0 +1,38 @@
+@{
+    ViewData["Title"] = "Administration";
+}
+
+<div class="container-fluid py-4">
+    <h2 class="mb-4"><i class="fas fa-cog me-2"></i>Administration</h2>
+    <p class="text-muted mb-4">Manage reference data used across the application.</p>
+
+    <div class="row g-4">
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-file-alt text-success me-2"></i>Document Types</h5>
+                    <p class="card-text small text-muted">Maintain document types (Bulletin). SOP, Work Instruction, etc.</p>
+                    <a asp-area="Admin" asp-controller="DocumentTypesAdmin" asp-action="Index" class="btn btn-outline-success btn-sm">Manage Document Types</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-history text-info me-2"></i>Document Audit History</h5>
+                    <p class="card-text small text-muted">View full audit trail of uploads, approvals, deletions, archives, and revisions.</p>
+                    <a asp-area="Admin" asp-controller="AuditLog" asp-action="Index" class="btn btn-outline-info btn-sm">View Audit History</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-trash-restore text-secondary me-2"></i>Document Archives</h5>
+                    <p class="card-text small text-muted">View and restore deleted documents.</p>
+                    <a asp-area="" asp-controller="DeletedFiles" asp-action="Index" class="btn btn-outline-secondary btn-sm">Open Archives</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

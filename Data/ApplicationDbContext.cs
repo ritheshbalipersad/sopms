@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using SOPMSApp.Migrations;
 using SOPMSApp.Models;
 
@@ -25,6 +25,8 @@ namespace SOPMSApp.Data
         public DbSet<Area> Areas { get; set; }
 
         public DbSet<DocRegisterHistory> DocRegisterHistories { get; set; }
+
+        public DbSet<DocumentAuditLog> DocumentAuditLogs { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -4,6 +4,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SOPMSApp.Data;
 using SOPMSApp.Models;
+using SOPMSApp.Services;
 using Dapper;
 
 
@@ -15,14 +16,16 @@ namespace SOPMSApp.Controllers
         private readonly IWebHostEnvironment _env;
         private readonly IConfiguration _configuration;
         private readonly ILogger<FileUploadController> _logger;
+        private readonly IDocumentAuditLogService _auditLog;
 
 
-        public MetaController(ApplicationDbContext context, IWebHostEnvironment env, IConfiguration configuration, ILogger<FileUploadController> logger)
+        public MetaController(ApplicationDbContext context, IWebHostEnvironment env, IConfiguration configuration, ILogger<FileUploadController> logger, IDocumentAuditLogService auditLog)
         {
             _context = context;
             _env = env;
             _configuration = configuration;
             _logger = logger;
+            _auditLog = auditLog;
         }
         public async Task<IActionResult> Index()
         {
@@ -65,8 +68,15 @@ namespace SOPMSApp.Controllers
                 .OrderByDescending(h => h.RevisedOn)
                 .ToListAsync();
 
+            var auditLogs = await _context.DocumentAuditLogs
+                .AsNoTracking()
+                .Where(a => a.DocRegisterId == docRegisterId || (a.SopNumber == document.SopNumber && a.DocRegisterId == null))
+                .OrderByDescending(a => a.PerformedAtUtc)
+                .ToListAsync();
+
             ViewBag.SopNumber = document.SopNumber;
             ViewBag.Title = $"{document.SopNumber} - Revision History";
+            ViewBag.AuditLogs = auditLogs;
 
             return View(historyList);
         }
@@ -96,6 +106,13 @@ namespace SOPMSApp.Controllers
 
             try
             {
+                // Audit log before we archive (so we still have doc.Id and SopNumber)
+                if (doc != null)
+                {
+                    await _auditLog.LogAsync(doc.Id, doc.SopNumber ?? "", "Archived", deletedBy,
+                        doc.DeletionReason ?? "Administrative deletion", doc.OriginalFile);
+                }
+
                 // Archive files - multiple folder search using new storage location
                 var (originalArchived, pdfArchived, videoArchived) = await ArchiveFilesAsync(doc, timestamp);
 
@@ -501,12 +518,15 @@ namespace SOPMSApp.Controllers
                 VideoUrl = GetVideoUrl(doc, fileInfo),
                 OtherFileUrl = GetOtherFileUrl(doc, fileInfo),
                 DownloadUrl = Url.Action("Download", "FileUpload", new { id = doc.Id }),
+                OriginalDownloadUrl = !string.IsNullOrWhiteSpace(doc.OriginalFile) && !string.IsNullOrWhiteSpace(doc.DocType)
+                    ? Url.Action("Originals", "FileAccess", new { docType = doc.DocType, fileName = doc.OriginalFile })
+                    : null,
                 StatusClass = GetStatusClass(doc.ReviewStatus)
             };
         }
 
         // Optimized GetFileInfo - no file system operations
-        private FileInfoResult GetFileInfo(DocRegister doc)
+        private Models.FileInfoResult GetFileInfo(DocRegister doc)
         {
             var displayName = !string.IsNullOrWhiteSpace(doc.FileName) && doc.FileName != "N/A"
                 ? doc.FileName
@@ -514,7 +534,7 @@ namespace SOPMSApp.Controllers
 
             var extension = System.IO.Path.GetExtension(displayName)?.ToLower() ?? "";
 
-            return new FileInfoResult
+            return new Models.FileInfoResult
             {
                 DisplayName = displayName,
                 IsPdf = extension == ".pdf",
@@ -527,35 +547,40 @@ namespace SOPMSApp.Controllers
         /// <summary>
         /// Generates a direct URL to a PDF in the FileAccessController, guaranteed to work from any controller/area.
         /// </summary>
-        private string GetPdfUrl(DocRegister doc, FileInfoResult fileInfo)
+        private string GetPdfUrl(DocRegister doc, Models.FileInfoResult fileInfo)
         {
-            if (!fileInfo.IsPdf || string.IsNullOrEmpty(fileInfo.DisplayName))
-                return "#"; // Not a PDF
+            // Prefer stored PDF filename; otherwise try original base name + .pdf so GetPdf can find converted PDFs
+            var fileName = !string.IsNullOrWhiteSpace(doc.FileName) && doc.FileName != "N/A"
+                ? doc.FileName
+                : null;
+            if (string.IsNullOrEmpty(fileName) && !string.IsNullOrWhiteSpace(doc.OriginalFile))
+            {
+                var ext = Path.GetExtension(doc.OriginalFile);
+                if (!string.IsNullOrEmpty(ext))
+                    fileName = Path.GetFileNameWithoutExtension(doc.OriginalFile) + ".pdf";
+            }
+            if (string.IsNullOrEmpty(fileName))
+                return "#";
 
-            var fileName = fileInfo.DisplayName;
-
-            // Always force area = "" so no Meta/ prefix is added
             var url = Url.Action(
                 action: "GetPdf",
                 controller: "FileAccess",
                 values: new { fileName = fileName, docType = doc.DocType, area = "" },
                 protocol: Request.Scheme
             );
-
-            // Fallback
             return string.IsNullOrEmpty(url) ? "#" : url;
         }
 
 
 
-        private string? GetVideoUrl(DocRegister doc, FileInfoResult fileInfo)
+        private string? GetVideoUrl(DocRegister doc, Models.FileInfoResult fileInfo)
         {
             return fileInfo.IsVideo
                 ? Url.Action("Videos", "FileAccess", new { fileName = doc.OriginalFile })
                 : "#";
         }
 
-        private string? GetOtherFileUrl(DocRegister doc, FileInfoResult fileInfo)
+        private string? GetOtherFileUrl(DocRegister doc, Models.FileInfoResult fileInfo)
         {
             return !fileInfo.IsPdf && !fileInfo.IsVideo
                 ? Url.Action("Originals", "FileAccess", new { docType = doc.DocType, fileName = doc.OriginalFile })

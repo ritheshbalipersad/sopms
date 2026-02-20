@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SOPMSApp.Data;
 using SOPMSApp.Models;
@@ -17,18 +17,22 @@ namespace SOPMSApp.Controllers
         private readonly FileRestoreService _fileRestoreService;
         private readonly FilePermanentDeleteService _filePermanentDeleteService;
 
+        private readonly IConfiguration _config;
+
         public DeletedFilesController(
             ApplicationDbContext context,
             IWebHostEnvironment env,
             ILogger<DeletedFilesController> logger,
             FileRestoreService fileRestoreService,
-            FilePermanentDeleteService filePermanentDeleteService)
+            FilePermanentDeleteService filePermanentDeleteService,
+            IConfiguration config)
         {
             _context = context;
             _env = env;
             _logger = logger;
             _fileRestoreService = fileRestoreService;
             _filePermanentDeleteService = filePermanentDeleteService;
+            _config = config;
         }
 
         // Check if Server 26 actually has data
@@ -70,6 +74,14 @@ namespace SOPMSApp.Controllers
                     .FromSqlRaw(sql)
                     .ToListAsync();
 
+                var restorableIds = new HashSet<int>();
+                foreach (var item in deletedFiles)
+                {
+                    if (_fileRestoreService.CanRestore(item))
+                        restorableIds.Add(item.Id);
+                }
+                ViewBag.RestorableIds = restorableIds;
+
                 return View(deletedFiles);
             }
             catch (Exception ex)
@@ -83,6 +95,13 @@ namespace SOPMSApp.Controllers
                     var deletedFiles26 = await _context.DeletedFileLogs
                         .FromSqlRaw(sql26)
                         .ToListAsync();
+                    var restorableIds26 = new HashSet<int>();
+                    foreach (var item in deletedFiles26)
+                    {
+                        if (_fileRestoreService.CanRestore(item))
+                            restorableIds26.Add(item.Id);
+                    }
+                    ViewBag.RestorableIds = restorableIds26;
                     return View(deletedFiles26);
                 }
                 catch
@@ -90,6 +109,14 @@ namespace SOPMSApp.Controllers
                     return View(new List<DeletedFileLog>());
                 }
             }
+        }
+
+        private string GetArchiveRootPath()
+        {
+            var basePath = _config["StorageSettings:BasePath"];
+            if (!string.IsNullOrEmpty(basePath))
+                return Path.Combine(basePath, "Archive", "Deleted");
+            return Path.Combine(_env.WebRootPath, "Archive", "Deleted");
         }
 
         // GET: /DeletedFiles/Details/5
@@ -102,7 +129,8 @@ namespace SOPMSApp.Controllers
                 return RedirectToAction(nameof(Index));
             }
 
-            var archiveRoot = Path.Combine(_env.WebRootPath, "Archive", "Deleted");
+            var archiveRoot = GetArchiveRootPath();
+            ViewBag.CanRestore = _fileRestoreService.CanRestore(deletedDoc);
             string displayFile = null;
             string fileUrl = null;
             bool isPdf = false;
@@ -121,6 +149,9 @@ namespace SOPMSApp.Controllers
                 ViewBag.FileUrl = fileUrl;
                 ViewBag.DisplayFileName = displayFile;
                 ViewBag.IsPdf = isPdf;
+                var archiveRootForFlags = GetArchiveRootPath();
+                ViewBag.HasPdf = TryGetArchivedPdfPath(deletedDoc, archiveRootForFlags).physicalPath != null;
+                ViewBag.HasOriginal = TryGetArchivedOriginalPath(deletedDoc, archiveRootForFlags).physicalPath != null;
             }
             else
             {
@@ -221,28 +252,189 @@ namespace SOPMSApp.Controllers
             return (null, null, false);
         }
 
+        /// <summary>Stream the archived file for preview/download. type = "pdf" | "original" to choose which file; omit for default (PDF first).</summary>
+        [HttpGet]
+        public async Task<IActionResult> ServeArchivedFile(int id, string type = null, bool download = false)
+        {
+            var deletedDoc = await _context.DeletedFileLogs.FindAsync(id);
+            if (deletedDoc == null)
+                return NotFound("Document not found in archive.");
+
+            var archiveRoot = GetArchiveRootPath();
+            var (physicalPath, contentType, displayName) = string.Equals(type, "original", StringComparison.OrdinalIgnoreCase)
+                ? TryGetArchivedOriginalPath(deletedDoc, archiveRoot)
+                : string.Equals(type, "pdf", StringComparison.OrdinalIgnoreCase)
+                    ? TryGetArchivedPdfPath(deletedDoc, archiveRoot)
+                    : TryGetArchivedFilePath(deletedDoc, archiveRoot);
+
+            return ServeFileResult(physicalPath, contentType, displayName, download);
+        }
+
+        /// <summary>Serve only the PDF from archive. Use this URL for "Download PDF" to avoid any mix-up with original.</summary>
+        [HttpGet]
+        public async Task<IActionResult> ServeArchivedPdf(int id, bool download = false)
+        {
+            var deletedDoc = await _context.DeletedFileLogs.FindAsync(id);
+            if (deletedDoc == null)
+                return NotFound("Document not found in archive.");
+            var archiveRoot = GetArchiveRootPath();
+            var (physicalPath, contentType, displayName) = TryGetArchivedPdfPath(deletedDoc, archiveRoot);
+            return ServeFileResult(physicalPath, contentType, displayName, download);
+        }
+
+        /// <summary>Serve only the original file from archive. Use this URL for "Download original file".</summary>
+        [HttpGet]
+        public async Task<IActionResult> ServeArchivedOriginal(int id, bool download = false)
+        {
+            var deletedDoc = await _context.DeletedFileLogs.FindAsync(id);
+            if (deletedDoc == null)
+                return NotFound("Document not found in archive.");
+            var archiveRoot = GetArchiveRootPath();
+            var (physicalPath, contentType, displayName) = TryGetArchivedOriginalPath(deletedDoc, archiveRoot);
+            return ServeFileResult(physicalPath, contentType, displayName, download);
+        }
+
+        private IActionResult ServeFileResult(string physicalPath, string contentType, string displayName, bool download)
+        {
+            if (string.IsNullOrEmpty(physicalPath) || !System.IO.File.Exists(physicalPath))
+                return NotFound("File not found in archive.");
+            var stream = new FileStream(physicalPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            if (download)
+                Response.Headers["Content-Disposition"] = $"attachment; filename=\"{displayName}\"";
+            else
+                Response.Headers["Content-Disposition"] = "inline";
+            return File(stream, contentType ?? "application/octet-stream", enableRangeProcessing: true);
+        }
+
+        private (string physicalPath, string contentType, string displayName) TryGetArchivedPdfPath(DeletedFileLog sop, string rootPath)
+        {
+            var pdfFolder = Path.Combine(rootPath, "PDFs");
+            if (!string.IsNullOrWhiteSpace(sop.FileName))
+            {
+                var pdfPath = Path.Combine(pdfFolder, sop.FileName);
+                if (System.IO.File.Exists(pdfPath))
+                    return (pdfPath, "application/pdf", sop.FileName);
+            }
+            string pdfBase = Path.GetFileNameWithoutExtension(sop.FileName ?? "");
+            if (!string.IsNullOrEmpty(pdfBase))
+            {
+                var matched = Directory.EnumerateFiles(pdfFolder).FirstOrDefault(f =>
+                    Path.GetFileNameWithoutExtension(f).Equals(pdfBase, StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrEmpty(matched))
+                    return (matched, "application/pdf", Path.GetFileName(matched));
+            }
+            return (null, null, null);
+        }
+
+        private (string physicalPath, string contentType, string displayName) TryGetArchivedOriginalPath(DeletedFileLog sop, string rootPath)
+        {
+            var originalFolder = Path.Combine(rootPath, "Originals");
+            var videoFolder = Path.Combine(rootPath, "Videos");
+            if (!string.IsNullOrWhiteSpace(sop.OriginalFileName))
+            {
+                var originalPath = Path.Combine(originalFolder, sop.OriginalFileName);
+                if (System.IO.File.Exists(originalPath))
+                {
+                    var ext = Path.GetExtension(sop.OriginalFileName)?.ToLower();
+                    return (originalPath, GetContentType(ext), sop.OriginalFileName);
+                }
+                var videoPath = Path.Combine(videoFolder, sop.OriginalFileName);
+                if (System.IO.File.Exists(videoPath))
+                {
+                    var ext = Path.GetExtension(sop.OriginalFileName)?.ToLower();
+                    return (videoPath, GetContentType(ext), sop.OriginalFileName);
+                }
+            }
+            string originalBase = Path.GetFileNameWithoutExtension(sop.OriginalFileName ?? "");
+            if (!string.IsNullOrEmpty(originalBase))
+            {
+                var matched = Directory.EnumerateFiles(originalFolder).FirstOrDefault(f =>
+                    Path.GetFileNameWithoutExtension(f).Equals(originalBase, StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrEmpty(matched))
+                {
+                    var ext = Path.GetExtension(matched)?.ToLower();
+                    return (matched, GetContentType(ext), Path.GetFileName(matched));
+                }
+                var matchedVideo = Directory.EnumerateFiles(videoFolder).FirstOrDefault(f =>
+                    Path.GetFileNameWithoutExtension(f).Equals(originalBase, StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrEmpty(matchedVideo))
+                {
+                    var ext = Path.GetExtension(matchedVideo)?.ToLower();
+                    return (matchedVideo, GetContentType(ext), Path.GetFileName(matchedVideo));
+                }
+            }
+            return (null, null, null);
+        }
+
+        private (string physicalPath, string contentType, string displayName) TryGetArchivedFilePath(DeletedFileLog sop, string rootPath)
+        {
+            var pdf = TryGetArchivedPdfPath(sop, rootPath);
+            if (!string.IsNullOrEmpty(pdf.physicalPath))
+                return pdf;
+            return TryGetArchivedOriginalPath(sop, rootPath);
+        }
+
+        private static string GetContentType(string extension)
+        {
+            return extension?.ToLower() switch
+            {
+                ".pdf" => "application/pdf",
+                ".doc" => "application/msword",
+                ".docx" => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                ".xls" or ".xlt" => "application/vnd.ms-excel",
+                ".xlsx" or ".xltx" => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                ".ppt" => "application/vnd.ms-powerpoint",
+                ".pptx" => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                ".mp4" => "video/mp4",
+                ".mov" => "video/quicktime",
+                ".avi" => "video/x-msvideo",
+                ".wmv" => "video/x-ms-wmv",
+                ".webm" => "video/webm",
+                ".mkv" => "video/x-matroska",
+                ".jpg" or ".jpeg" => "image/jpeg",
+                ".png" => "image/png",
+                ".gif" => "image/gif",
+                _ => "application/octet-stream"
+            };
+        }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> RestoreDocument(int id)
         {
+            var isAjax = Request.Headers["X-Requested-With"] == "XMLHttpRequest" ||
+                         Request.Headers["Accept"].ToString().Contains("application/json", StringComparison.OrdinalIgnoreCase);
+
             try
             {
                 var deletedLog = await _context.DeletedFileLogs.FindAsync(id);
                 if (deletedLog == null)
                 {
-                    TempData["Error"] = "Document not found in archive.";
+                    var msg = "Document not found in archive.";
+                    if (isAjax) return Json(new { success = false, error = msg });
+                    TempData["Error"] = msg;
                     return RedirectToAction(nameof(Index));
                 }
 
-                await _fileRestoreService.RestoreDocumentAsync(deletedLog);
+                var restored = await _fileRestoreService.RestoreDocumentAsync(deletedLog);
+                if (!restored)
+                {
+                    var msg = "Document could not be restored. It may already exist in active documents, or files could not be moved.";
+                    if (isAjax) return Json(new { success = false, error = msg });
+                    TempData["Error"] = msg;
+                    return RedirectToAction(nameof(Index));
+                }
 
+                if (isAjax) return Json(new { success = true, message = $"Document '{deletedLog.OriginalFileName}' successfully restored." });
                 TempData["Success"] = $"Document '{deletedLog.OriginalFileName}' successfully restored.";
-                _logger.LogInformation("Document restored: {FileName} by {User}", deletedLog.OriginalFileName, User.Identity.Name);
+                _logger.LogInformation("Document restored: {FileName} by {User}", deletedLog.OriginalFileName, User.Identity?.Name);
             }
             catch (Exception ex)
             {
-                TempData["Error"] = $"Error restoring document: {ex.Message}";
                 _logger.LogError(ex, "Error restoring document ID: {DocumentId}", id);
+                var msg = $"Error restoring document: {ex.Message}";
+                if (isAjax) return StatusCode(500, new { success = false, error = msg });
+                TempData["Error"] = msg;
             }
 
             return RedirectToAction(nameof(Index));
@@ -252,24 +444,32 @@ namespace SOPMSApp.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeletePermanent(int id)
         {
+            var isAjax = Request.Headers["X-Requested-With"] == "XMLHttpRequest" ||
+                         Request.Headers["Accept"].ToString().Contains("application/json", StringComparison.OrdinalIgnoreCase);
+
             try
             {
                 var deletedLog = await _context.DeletedFileLogs.FindAsync(id);
                 if (deletedLog == null)
                 {
-                    TempData["Error"] = "Document not found in archive.";
+                    var msg = "Document not found in archive.";
+                    if (isAjax) return Json(new { success = false, error = msg });
+                    TempData["Error"] = msg;
                     return RedirectToAction(nameof(Index));
                 }
 
                 await _filePermanentDeleteService.PermanentlyDeleteAsync(deletedLog);
 
+                if (isAjax) return Json(new { success = true, message = $"Document '{deletedLog.OriginalFileName}' permanently deleted." });
                 TempData["Success"] = $"Document '{deletedLog.OriginalFileName}' permanently deleted.";
-                _logger.LogInformation("Document permanently deleted: {FileName} by {User}", deletedLog.OriginalFileName, User.Identity.Name);
+                _logger.LogInformation("Document permanently deleted: {FileName} by {User}", deletedLog.OriginalFileName, User.Identity?.Name);
             }
             catch (Exception ex)
             {
-                TempData["Error"] = $"Error permanently deleting document: {ex.Message}";
                 _logger.LogError(ex, "Error permanently deleting document ID: {DocumentId}", id);
+                var msg = $"Error permanently deleting document: {ex.Message}";
+                if (isAjax) return StatusCode(500, new { success = false, error = msg });
+                TempData["Error"] = msg;
             }
 
             return RedirectToAction(nameof(Index));

@@ -1,4 +1,4 @@
-﻿@using System.IO
+@using System.IO
 @model IEnumerable<SOPMSApp.Models.DocRegisterViewModel>
 @inject IWebHostEnvironment HostingEnvironment
 @inject Microsoft.Extensions.Configuration.IConfiguration Configuration
@@ -351,10 +351,17 @@
                                             <!-- Delete Button -->
                                             @if (User.IsInRole("Admin"))
                                             {
-                                                 <!-- Download Button -->
+                                                 <!-- Download (PDF/preferred) Button -->
                                                 <a href="@vm.DownloadUrl" class="btn btn-sm btn-outline-success action-btn" title="Download Document">
                                                     <i class="fas fa-download"></i>
                                                 </a>
+                                                <!-- Download Original Button -->
+                                                @if (!string.IsNullOrEmpty(vm.OriginalDownloadUrl))
+                                                {
+                                                    <a href="@vm.OriginalDownloadUrl" class="btn btn-sm btn-outline-primary action-btn" title="Download Original Uploaded Document" download>
+                                                        <i class="fas fa-file-download"></i>
+                                                    </a>
+                                                }
 
                                                 <!-- Delete Form -->
                                                 <form asp-action="Delete" asp-controller="Meta" asp-route-id="@doc.Id" method="post" class="d-inline">
@@ -954,16 +961,16 @@ else
                 e.stopPropagation();
         
                 const $this = $(this);
+                const $row = $this.closest('tr');
                 const fileData = {
-                    fileName: $this.data('file-name'),
-                    downloadUrl: $this.data('download-url'),
+                    fileName: $this.data('file-name') || $row.data('file-name'),
                     originalFile: $this.data('original-file'),
                     sopFileName: $this.data('sop-file-name'),
                     videoPath: $this.data('video-path'),
-                    docType: $this.data('doc-type') || ''
+                    docType: $this.data('doc-type') || '',
+                    downloadUrl: $row.data('download-url'),
+                    pdfUrl: $row.data('file-url')
                 };
-
-                console.log('Preview clicked:', fileData);
 
                 const availability = detectFileAvailabilityClientSide(
                     fileData.originalFile, 
@@ -971,8 +978,10 @@ else
                     fileData.videoPath, 
                     fileData.docType
                 );
-
-                console.log('File availability:', availability);
+                if (fileData.pdfUrl && fileData.pdfUrl !== '#' && fileData.pdfUrl.trim() !== '') {
+                    availability.pdfUrl = fileData.pdfUrl;
+                    availability.hasPdf = true;
+                }
         
                 openChoosePreviewModal(
                     availability.pdfUrl,
@@ -1000,6 +1009,11 @@ else
                    file.toLowerCase() !== "null";
         }
 
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
         function detectFileAvailabilityClientSide(originalFile, sopFileName, videoPath, docType = '') {
             const result = {
                 hasPdf: false,
@@ -1024,17 +1038,16 @@ else
             if (pdfFileName) {
                 result.hasPdf = true;
                 result.pdfFileName = pdfFileName;
-        
                 const encodedFileName = encodeURIComponent(pdfFileName);
                 const encodedDocType = docType ? `&docType=${encodeURIComponent(docType)}` : "";
-                result.pdfUrl = `${appBasePath}/FileAccess/GetPdf?fileName=${encodedFileName}${encodedDocType}`;
+                result.pdfUrl = `/FileAccess/GetPdf?fileName=${encodedFileName}${encodedDocType}`;
             }
 
             // Video Detection
             if (isValidFile(videoPath)) {
                 result.hasVideo = true;
                 const encodedVideo = encodeURIComponent(videoPath);
-                result.videoUrl = `${appBasePath}/FileAccess/GetVideo?videoPath=${encodedVideo}`;
+                result.videoUrl = `/FileAccess/GetVideo?videoPath=${encodedVideo}`;
             }
 
             return result;
@@ -1184,14 +1197,7 @@ else
                 showUnsupportedPreview();
                 return;
             }
-            // Option 1: Direct navigation (current behavior)
-            //window.location.href = url;
-    
-            // Option 2: Open in new tab (alternative)
-            // window.open(url, '_blank');
-    
-            // Option 3: Show in modal (if you want inline PDF viewing)
-             showPdfInModal(url);
+            showPdfInModal(url);
         }
 
         function showPdfInModal(url) {
@@ -1203,27 +1209,32 @@ else
                                 <h5 class="modal-title">PDF Preview</h5>
                                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                             </div>
-                            <div class="modal-body p-0" style="height: 80vh;">
-                                <iframe src="${url}" style="width: 100%; height: 100%; border: none;"></iframe>
+                            <div class="modal-body p-0 d-flex flex-column" style="height: 80vh;">
+                                <div class="d-flex gap-2 p-2 bg-light border-bottom flex-shrink-0">
+                                    <a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-external-link-alt me-1"></i>Open in new tab
+                                    </a>
+                                    <a href="${escapeHtml(url)}" class="btn btn-sm btn-outline-success" download>
+                                        <i class="fas fa-download me-1"></i>Download
+                                    </a>
+                                </div>
+                                <div class="flex-grow-1 position-relative" style="min-height: 0;">
+                                    <iframe src="${escapeHtml(url)}" title="PDF preview" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;"></iframe>
+                                </div>
                             </div>
                             <div class="modal-footer">
                                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                                <a href="${url}" class="btn btn-primary" download>Download</a>
                             </div>
                         </div>
                     </div>
                 </div>
             `;
-    
-            // Remove existing modal if any
+
             $('#pdfModal').remove();
-    
-            // Append new modal and show it
             $('body').append(modalHtml);
             const pdfModal = new bootstrap.Modal(document.getElementById('pdfModal'));
             pdfModal.show();
-    
-            // Cleanup on hide
+
             $('#pdfModal').on('hidden.bs.modal', function() {
                 $(this).remove();
             });

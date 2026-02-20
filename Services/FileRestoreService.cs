@@ -1,4 +1,4 @@
-﻿using Microsoft.Data.SqlClient;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SOPMSApp.Data;
 using SOPMSApp.Models;
@@ -49,11 +49,11 @@ public class FileRestoreService
             }
 
 
-            // 3. Get the document type for directory structure
-            var docType = await GetValidDocumentTypeAsync(deletedLog.DocType);
+            // 3. Get the document type for directory structure (use Bulletin match or safe fallback)
+            var docType = await GetDocumentTypeForRestoreAsync(deletedLog.DocType);
             if (string.IsNullOrEmpty(docType))
             {
-                _logger.LogWarning("Invalid document type for restoration: {DocType}", deletedLog.DocType);
+                _logger.LogWarning("Could not determine document type for restoration: {DocType}", deletedLog.DocType);
                 return false;
             }
 
@@ -85,8 +85,8 @@ public class FileRestoreService
         {
             _logger.LogError(ex, "Failed to restore document: {FileName}", deletedLog.OriginalFileName);
 
-            // Attempt rollback on failure
-            var docType = await GetValidDocumentTypeAsync(deletedLog.DocType);
+            // Attempt rollback on failure (use same doc type resolution as restore)
+            var docType = await GetDocumentTypeForRestoreAsync(deletedLog.DocType);
             if (!string.IsNullOrEmpty(docType))
             {
                 await RollbackFileMovement(deletedLog, docType);
@@ -276,18 +276,44 @@ public class FileRestoreService
         }
     }
 
+    /// <summary>Returns a document type safe for path use: Bulletin match, or sanitized DocType, or "General".</summary>
+    private async Task<string> GetDocumentTypeForRestoreAsync(string docType)
+    {
+        try
+        {
+            var validDocTypes = await GetDistinctDocumentsAsync();
+            if (validDocTypes != null && validDocTypes.Count > 0 && !string.IsNullOrEmpty(docType))
+            {
+                var matched = validDocTypes
+                    .FirstOrDefault(d => d.Equals(docType, StringComparison.OrdinalIgnoreCase));
+                if (!string.IsNullOrEmpty(matched))
+                    return matched;
+            }
+            // Fallback: use sanitized DocType from log or "General" so restore can proceed
+            var fallback = string.IsNullOrWhiteSpace(docType)
+                ? "General"
+                : string.Join("_", docType.Trim().Split(Path.GetInvalidFileNameChars(), StringSplitOptions.RemoveEmptyEntries));
+            if (string.IsNullOrEmpty(fallback))
+                fallback = "General";
+            _logger.LogInformation("Using document type fallback for restore: {Fallback} (original: {DocType})", fallback, docType);
+            return fallback;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting document type for restore: {DocType}", docType);
+            return string.IsNullOrWhiteSpace(docType) ? "General" : "General";
+        }
+    }
+
     private async Task<string> GetValidDocumentTypeAsync(string docType)
     {
         if (string.IsNullOrEmpty(docType))
             return null;
-
         try
         {
             var validDocTypes = await GetDistinctDocumentsAsync();
-            var matchedDocType = validDocTypes
+            return validDocTypes?
                 .FirstOrDefault(d => d.Equals(docType, StringComparison.OrdinalIgnoreCase));
-
-            return matchedDocType;
         }
         catch (Exception ex)
         {

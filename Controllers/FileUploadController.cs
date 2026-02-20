@@ -1,4 +1,4 @@
-﻿using ClosedXML.Excel;
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Rendering;
@@ -23,10 +23,11 @@ namespace SOPMSApp.Controllers
         private readonly entTTSAPDbContext _entTTSAPDbContext;
         private readonly ILogger<FileUploadController> _logger;
         private readonly DocRegisterService _docRegisterService;
+        private readonly IDocumentAuditLogService _auditLog;
         private readonly string _storageRoot;
 
 
-        public FileUploadController( ApplicationDbContext context, IWebHostEnvironment env, IConfiguration configuration, DocRegisterService docRegisterService,ILogger<FileUploadController> logger,DocFileService fileService,entTTSAPDbContext entTTSAPDbContext )
+        public FileUploadController( ApplicationDbContext context, IWebHostEnvironment env, IConfiguration configuration, DocRegisterService docRegisterService, ILogger<FileUploadController> logger, DocFileService fileService, entTTSAPDbContext entTTSAPDbContext, IDocumentAuditLogService auditLog )
         {
             _env = env;
             _logger = logger;
@@ -35,8 +36,8 @@ namespace SOPMSApp.Controllers
             _configuration = configuration;
             _entTTSAPDbContext = entTTSAPDbContext;
             _docRegisterService = docRegisterService;
+            _auditLog = auditLog;
             _storageRoot = configuration["StorageSettings:BasePath"];
-
         }
 
 
@@ -296,9 +297,11 @@ namespace SOPMSApp.Controllers
                     _context.DocRegisters.Update(docRecord);
                 }
 
-                // Save DB first so we have an Id (if new) 
-                
+                // Save DB first so we have an Id (if new)
                 await _context.SaveChangesAsync();
+
+                var performedBy = User.FindFirst("LaborName")?.Value ?? User.Identity?.Name ?? "System";
+                await _auditLog.LogAsync(docRecord.Id, docRecord.SopNumber ?? "", "Uploaded", performedBy, null, docRecord.OriginalFile);
 
                 // --- Call procedure to insert email log ---
                 if (!string.IsNullOrEmpty(docRecord.SupervisorEmail) && docRecord.SupervisorEmail != "N/A")
@@ -554,36 +557,44 @@ namespace SOPMSApp.Controllers
 
         private async Task<List<string>> GetDistinctAreasAsync()
         {
-            var areas = new List<string>();
-            string connStr = _configuration.GetConnectionString("entTTSAPConnection");
-
+            // Prefer Areas from DocRet (maintained in Admin) so upload page shows all areas in the db
             try
             {
-                using (SqlConnection conn = new SqlConnection(connStr))
+                var fromDb = await _context.Areas
+                    .OrderBy(a => a.AreaName)
+                    .Select(a => a.AreaName)
+                    .ToListAsync();
+                if (fromDb.Count > 0)
+                    return fromDb;
+            }
+            catch { /* Areas table may not exist in some setups */ }
+
+            // Fallback: entTTSAP.asset (legacy)
+            var areas = new List<string>();
+            string connStr = _configuration.GetConnectionString("entTTSAPConnection");
+            if (string.IsNullOrEmpty(connStr)) return areas;
+            try
+            {
+                using (var conn = new SqlConnection(connStr))
                 {
-                    string sql = "SELECT assetname AS AreaName FROM asset WHERE udfbit5 = 1 AND isup = 1";
-                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    string sql = "SELECT assetname AS AreaName FROM asset WHERE udfbit5 = 1 AND isup = 1 ORDER BY assetname";
+                    using (var cmd = new SqlCommand(sql, conn))
                     {
                         await conn.OpenAsync();
-                        using (SqlDataReader reader = await cmd.ExecuteReaderAsync())
+                        using (var reader = await cmd.ExecuteReaderAsync())
                         {
                             while (await reader.ReadAsync())
                             {
-                                string areaName = reader["AreaName"]?.ToString();
+                                var areaName = reader["AreaName"]?.ToString();
                                 if (!string.IsNullOrEmpty(areaName))
-                                {
                                     areas.Add(areaName);
-                                }
                             }
                         }
                     }
                 }
-                return areas;
             }
-            catch (Exception)
-            {
-                return new List<string>(); // Return empty list on error
-            }
+            catch { /* ignore */ }
+            return areas;
         }
 
         private async Task<List<string>> GetDistinctDocumentsAsync()
@@ -1251,11 +1262,15 @@ namespace SOPMSApp.Controllers
                 try
                 {
                     // Save documents in batches to avoid timeouts
+                    var performedBy = User.FindFirst("LaborName")?.Value ?? User.Identity?.Name ?? "System";
                     for (int i = 0; i < documentsToCreate.Count; i += batchSize)
                     {
                         var batch = documentsToCreate.Skip(i).Take(batchSize).ToList();
                         await _context.DocRegisters.AddRangeAsync(batch);
                         await _context.SaveChangesAsync();
+
+                        foreach (var doc in batch)
+                            await _auditLog.LogAsync(doc.Id, doc.SopNumber ?? "", "Uploaded", performedBy, "Bulk upload", doc.OriginalFile);
 
                         // Process files for this batch
                         var batchResult = await ProcessFilesBatchAsync(files, batch, fileLookup, originalsFolder, pdfFolder, videosFolder, processedFiles, errors);
@@ -1513,84 +1528,90 @@ namespace SOPMSApp.Controllers
                 if (document == null)
                     return NotFound("Document metadata not found.");
 
-                if (string.IsNullOrWhiteSpace(document.OriginalFile))
+                if (string.IsNullOrWhiteSpace(document.OriginalFile) && string.IsNullOrWhiteSpace(document.FileName))
                     return BadRequest("Document filename is missing.");
 
-                string fileName = Path.GetFileName(document.OriginalFile);
-
-                // Get the base path from configuration
                 var basePath = _configuration["StorageSettings:BasePath"];
                 if (string.IsNullOrEmpty(basePath))
                     return StatusCode(500, "Storage configuration is missing.");
 
-                // Define the search locations based on your new structure
-                var searchPaths = new List<string>();
-
-                // Add the main file locations
-                searchPaths.Add(Path.Combine(basePath, "PDFs", fileName)); // PDF files
-                searchPaths.Add(Path.Combine(basePath, "Videos", fileName));   // Video files
-
-                // Add document type specific location
-                if (!string.IsNullOrWhiteSpace(document.DocType))
-                {
-                    searchPaths.Add(Path.Combine(basePath, "Originals", document.DocType, fileName));
-                }
-
-                // Also search in general Originals folder as fallback
-                searchPaths.Add(Path.Combine(basePath, "Originals", fileName));
+                // "Download Document" = PDF only. Search ONLY in PDFs folder for a .pdf file.
+                string pdfFileName = !string.IsNullOrWhiteSpace(document.FileName) ? Path.GetFileName(document.FileName) : null;
+                string originalFileName = Path.GetFileName(document.OriginalFile ?? "");
+                string originalBaseNoExt = Path.GetFileNameWithoutExtension(originalFileName);
 
                 string actualFilePath = null;
+                string downloadName = null;
+                var pdfFolder = Path.Combine(basePath, "PDFs");
 
-                // Find the first existing file
-                foreach (var path in searchPaths)
+                if (Directory.Exists(pdfFolder))
                 {
-                    if (System.IO.File.Exists(path))
+                    var allPdfs = Directory.GetFiles(pdfFolder, "*.pdf", SearchOption.AllDirectories);
+                    // Match by stored PDF filename, or by original base name + .pdf
+                    var pdfMatch = allPdfs.FirstOrDefault(f =>
                     {
-                        actualFilePath = path;
-                        break;
+                        var name = Path.GetFileName(f);
+                        var baseName = Path.GetFileNameWithoutExtension(f);
+                        if (!string.IsNullOrEmpty(pdfFileName) && name.Equals(pdfFileName, StringComparison.OrdinalIgnoreCase))
+                            return true;
+                        if (!string.IsNullOrEmpty(originalBaseNoExt) && baseName.Equals(originalBaseNoExt, StringComparison.OrdinalIgnoreCase))
+                            return true;
+                        return false;
+                    });
+                    if (pdfMatch != null)
+                    {
+                        actualFilePath = pdfMatch;
+                        downloadName = Path.GetFileName(pdfMatch);
                     }
                 }
 
-                // If not found with exact name, try case-insensitive search
-                if (actualFilePath == null)
+                // "Download Original" is a separate link; this action should only serve PDF for main download.
+                // If no PDF exists, fall back to original file so the button still works.
+                if (actualFilePath == null && !string.IsNullOrEmpty(originalFileName))
                 {
-                    var searchFolders = new List<string>
+                    var searchPathsOriginal = new List<string>
                     {
-                        Path.Combine(basePath, "PDFs"),
-                        Path.Combine(basePath, "Videos"),
-                        Path.Combine(basePath, "Originals")
+                        Path.Combine(basePath, "Originals", originalFileName),
+                        Path.Combine(basePath, "Videos", originalFileName)
                     };
-
-                    // Add document type specific folder if available
                     if (!string.IsNullOrWhiteSpace(document.DocType))
+                        searchPathsOriginal.Insert(0, Path.Combine(basePath, "Originals", document.DocType, originalFileName));
+
+                    foreach (var path in searchPathsOriginal)
                     {
-                        searchFolders.Add(Path.Combine(basePath, "Originals", document.DocType));
-                    }
-
-                    foreach (var folder in searchFolders)
-                    {
-                        if (!Directory.Exists(folder)) continue;
-
-                        var match = Directory.GetFiles(folder, "*", SearchOption.AllDirectories)
-                                            .FirstOrDefault(f => Path.GetFileName(f)
-                                            .Equals(fileName, StringComparison.OrdinalIgnoreCase));
-
-                        if (match != null)
+                        if (System.IO.File.Exists(path))
                         {
-                            actualFilePath = match;
+                            actualFilePath = path;
+                            downloadName = document.OriginalFile;
                             break;
                         }
                     }
                 }
 
                 if (actualFilePath == null)
-                    return NotFound($"The physical file '{fileName}' could not be found in the storage location.");
+                {
+                    var origFolder = Path.Combine(basePath, "Originals");
+                    var vidFolder = Path.Combine(basePath, "Videos");
+                    foreach (var folder in new[] { origFolder, vidFolder })
+                    {
+                        if (!Directory.Exists(folder)) continue;
+                        var match = Directory.GetFiles(folder, "*", SearchOption.AllDirectories)
+                            .FirstOrDefault(f => Path.GetFileName(f).Equals(originalFileName, StringComparison.OrdinalIgnoreCase));
+                        if (match != null)
+                        {
+                            actualFilePath = match;
+                            downloadName = document.OriginalFile;
+                            break;
+                        }
+                    }
+                }
 
-                // Determine content type
+                if (actualFilePath == null)
+                    return NotFound("The document file could not be found in the storage location.");
+
                 string contentType = GetMimeType(Path.GetExtension(actualFilePath)) ?? "application/octet-stream";
-
-                // Use the original file name for download
-                var downloadName = document.OriginalFile;
+                if (string.IsNullOrEmpty(downloadName))
+                    downloadName = Path.GetFileName(actualFilePath);
 
                 return PhysicalFile(actualFilePath, contentType, downloadName, enableRangeProcessing: true);
             }

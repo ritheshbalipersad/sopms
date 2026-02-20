@@ -1,4 +1,4 @@
-﻿using DinkToPdf;
+using DinkToPdf;
 using DinkToPdf.Contracts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
@@ -7,6 +7,7 @@ using Microsoft.VisualStudio.Web.CodeGenerators.Mvc.Templates.Blazor;
 using SOPMSApp.Data;
 using SOPMSApp.Extensions;
 using SOPMSApp.Models;
+using SOPMSApp.Services;
 using SOPMSApp.ViewModels;
 using System.Data;
 using System.Security.Claims;
@@ -15,26 +16,26 @@ namespace SOPMSApp.Controllers
 {
     public class ApprovalsController : Controller
     {
-
         private readonly IConfiguration _config;
         private readonly IConverter _pdfConverter;
         private readonly IConfiguration _configuration;
         private readonly ApplicationDbContext _context;
         private readonly IWebHostEnvironment _hostingEnvironment;
         private readonly ILogger<StructuredSopController> _logger;
+        private readonly IDocumentAuditLogService _auditLog;
         private readonly string _storageRoot;
 
 
-        public ApprovalsController(IConfiguration config, ApplicationDbContext context, IWebHostEnvironment hostingEnvironment, IConverter pdfConverter, IConfiguration configuration, ILogger<StructuredSopController> logger)
+        public ApprovalsController(IConfiguration config, ApplicationDbContext context, IWebHostEnvironment hostingEnvironment, IConverter pdfConverter, IConfiguration configuration, ILogger<StructuredSopController> logger, IDocumentAuditLogService auditLog)
         {
             _config = config;
-            _logger = logger; 
+            _logger = logger;
             _context = context;
             _configuration = configuration;
             _pdfConverter = pdfConverter;
             _hostingEnvironment = hostingEnvironment;
+            _auditLog = auditLog;
             _storageRoot = config["StorageSettings:BasePath"];
-
         }
 
         // View all pending approvals and deletions
@@ -339,15 +340,17 @@ namespace SOPMSApp.Controllers
                 await _context.SaveChangesAsync();
                 await tx.CommitAsync();
 
+                var sopNum = sop.StructuredSop?.SopNumber ?? sop.DocRegister?.SopNumber ?? "";
+                await _auditLog.LogAsync(sop.DocRegister?.Id, sopNum, "Approved", user.Name, null, sop.DocRegister?.OriginalFile ?? sop.StructuredSop?.Title);
+
                 // 🔔 Send Final Approval Email to Uploader/Author
                 try
                 {
-                    var sopNumber = sop.StructuredSop?.SopNumber ?? sop.DocRegister?.SopNumber;
-                    await NotifyAuthorFinalApprovalAsync(sopNumber, sop, user.Name, time);
+                    await NotifyAuthorFinalApprovalAsync(sopNum, sop, user.Name, time);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to send final approval author notification for SOP {SopNumber}", sop.StructuredSop?.SopNumber ?? sop.DocRegister?.SopNumber);
+                    _logger.LogWarning(ex, "Failed to send final approval author notification for SOP {SopNumber}", sopNum);
                 }
 
                 return ApprovalResult.Success("SOP fully approved, PDF generated, and author notified.");
@@ -780,8 +783,9 @@ namespace SOPMSApp.Controllers
 
                     await _context.SaveChangesAsync();
                     await transaction.CommitAsync();
-                   
-                    
+
+                    await _auditLog.LogAsync(doc?.Id, sopNumber, "Returned for Review", reviewer, reason, doc?.OriginalFile ?? structured?.Title);
+
                     // 🔔 Notify author about rejection
                     try
                     {
@@ -850,6 +854,8 @@ namespace SOPMSApp.Controllers
                         _context.DocRegisters.Update(doc);
                         await _context.SaveChangesAsync();
                         await transaction.CommitAsync();
+
+                        await _auditLog.LogAsync(doc.Id, sopNumber, "Returned for Review", reviewer, reason, doc.OriginalFile);
 
                         // Notify author about rejection
                         try
@@ -1137,6 +1143,9 @@ namespace SOPMSApp.Controllers
 
             try
             {
+                if (doc != null)
+                    await _auditLog.LogAsync(doc.Id, doc.SopNumber ?? "", "Archived", deletedBy, doc.DeletionReason ?? "Approved for deletion", doc.OriginalFile);
+
                 // Archive files - multiple folder search using new storage location
                 var (originalArchived, pdfArchived, videoArchived) = await ArchiveFilesAsync(doc, timestamp);
 
@@ -1435,8 +1444,15 @@ namespace SOPMSApp.Controllers
                 .OrderByDescending(h => h.RevisedOn)
                 .ToListAsync();
 
+            var auditLogs = await _context.DocumentAuditLogs
+                .AsNoTracking()
+                .Where(a => a.DocRegisterId == docRegisterId || (a.SopNumber == document.SopNumber && a.DocRegisterId == null))
+                .OrderByDescending(a => a.PerformedAtUtc)
+                .ToListAsync();
+
             ViewBag.SopNumber = document.SopNumber;
             ViewBag.Title = $"{document.SopNumber} - Revision History";
+            ViewBag.AuditLogs = auditLogs;
 
             return View(historyList);
         }

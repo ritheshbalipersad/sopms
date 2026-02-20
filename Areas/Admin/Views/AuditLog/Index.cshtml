@@ -1,0 +1,119 @@
+@model List<SOPMSApp.Models.DocumentAuditLog>
+@{
+    ViewData["Title"] = "Document Audit History";
+    var sopNumber = ViewBag.SopNumber as string;
+    var actionType = ViewBag.ActionType as string;
+    var performedBy = ViewBag.PerformedBy as string;
+    var from = ViewBag.From as DateTime?;
+    var to = ViewBag.To as DateTime?;
+    var pageNum = (int)(ViewBag.Page ?? 1);
+    var pageSize = (int)(ViewBag.PageSize ?? 50);
+    var totalCount = (int)(ViewBag.TotalCount ?? 0);
+    var totalPages = (int)(ViewBag.TotalPages ?? 0);
+    var actions = ViewBag.Actions as List<string> ?? new List<string>();
+}
+
+<div class="container-fluid py-4">
+    <h2 class="mb-4"><i class="fas fa-history me-2"></i>Document Audit History</h2>
+    <p class="text-muted">Full audit trail of document uploads, approvals, deletions, archives, and revisions.</p>
+
+    <!-- Filters -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <form method="get" asp-area="Admin" asp-controller="AuditLog" asp-action="Index" class="row g-3">
+                <div class="col-md-2">
+                    <label class="form-label small">SOP Number</label>
+                    <input type="text" name="sopNumber" value="@sopNumber" class="form-control form-control-sm" placeholder="e.g. SOP001" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Action</label>
+                    <select name="actionType" class="form-select form-select-sm">
+                        <option value="">All</option>
+                        @foreach (var a in actions)
+                        {
+                            <option value="@a" selected="@(actionType == a)">@a</option>
+                        }
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">Performed By</label>
+                    <input type="text" name="performedBy" value="@performedBy" class="form-control form-control-sm" placeholder="User name" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">From Date</label>
+                    <input type="date" name="from" value="@(from?.ToString("yyyy-MM-dd"))" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label small">To Date</label>
+                    <input type="date" name="to" value="@(to?.ToString("yyyy-MM-dd"))" class="form-control form-control-sm" />
+                </div>
+                <div class="col-md-2 d-flex align-items-end gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm"><i class="fas fa-search me-1"></i> Filter</button>
+                    <a asp-area="Admin" asp-controller="AuditLog" asp-action="Index" class="btn btn-outline-secondary btn-sm">Clear</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-muted small">@totalCount record(s)</span>
+                @if (totalPages > 1)
+                {
+                    <nav>
+                        <ul class="pagination pagination-sm mb-0">
+                            @if (pageNum > 1)
+                            {
+                                <li class="page-item"><a class="page-link" href="?page=@(pageNum - 1)&pageSize=@pageSize&sopNumber=@sopNumber&actionType=@actionType&performedBy=@performedBy&from=@(from?.ToString("yyyy-MM-dd"))&to=@(to?.ToString("yyyy-MM-dd"))">Previous</a></li>
+                            }
+                            <li class="page-item active"><span class="page-link">@pageNum of @totalPages</span></li>
+                            @if (pageNum < totalPages)
+                            {
+                                <li class="page-item"><a class="page-link" href="?page=@(pageNum + 1)&pageSize=@pageSize&sopNumber=@sopNumber&actionType=@actionType&performedBy=@performedBy&from=@(from?.ToString("yyyy-MM-dd"))&to=@(to?.ToString("yyyy-MM-dd"))">Next</a></li>
+                            }
+                        </ul>
+                    </nav>
+                }
+            </div>
+            @if (Model.Count == 0)
+            {
+                <p class="text-muted mb-0">No audit records match the filters.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-sm table-hover">
+                        <thead>
+                            <tr>
+                                <th>Time (UTC)</th>
+                                <th>SOP Number</th>
+                                <th>Action</th>
+                                <th>Performed By</th>
+                                <th>Document</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in Model)
+                            {
+                                <tr>
+                                    <td>@log.PerformedAtUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                                    <td>@log.SopNumber</td>
+                                    <td><span class="badge bg-secondary">@log.Action</span></td>
+                                    <td>@log.PerformedBy</td>
+                                    <td class="text-truncate" style="max-width:200px" title="@log.DocumentTitle">@(log.DocumentTitle ?? "—")</td>
+                                    <td class="text-truncate" style="max-width:250px" title="@log.Details">@(log.Details ?? "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+    <p class="mt-3">
+        <a asp-area="Admin" asp-controller="Admin" asp-action="Index"><i class="fas fa-arrow-left me-1"></i>Back to Administration</a>
+    </p>
+</div>

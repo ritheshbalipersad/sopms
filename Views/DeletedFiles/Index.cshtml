@@ -1,6 +1,7 @@
-﻿@model List<SOPMSApp.Models.DeletedFileLog>
+@model List<SOPMSApp.Models.DeletedFileLog>
 @{
     ViewData["Title"] = "Deleted Documents Archive";
+    var restorableIds = ViewBag.RestorableIds as HashSet<int> ?? new HashSet<int>();
 
     // Define the function in the view
     string GetFileIcon(string fileName)
@@ -45,6 +46,7 @@
 
 @if (User.Identity.IsAuthenticated && User.IsInRole("Admin"))
 {
+    @Html.AntiForgeryToken()
     <div class="deleted-files-container">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
@@ -199,7 +201,7 @@
                             <tbody>
                                 @foreach (var item in Model.OrderByDescending(d => d.DeletedOn))
                                 {
-                                    <tr data-sop="@item.SOPNumber" data-user="@item.DeletedBy" data-date="@item.DeletedOn.ToString("yyyy-MM-dd")">
+                                    <tr data-sop="@item.SOPNumber" data-user="@item.DeletedBy" data-date="@item.DeletedOn.ToString("yyyy-MM-dd")" data-restorable="@(restorableIds.Contains(item.Id) ? "true" : "false")">
                                         <td>
                                             <input type="checkbox" class="form-check-input row-select" value="@item.Id">
                                         </td>
@@ -240,7 +242,16 @@
                                                     <i class="fas fa-eye"></i>
                                                     <span class="d-none d-sm-inline"></span>
                                                 </a>
-                                               
+                                                @if (restorableIds.Contains(item.Id))
+                                                {
+                                                    <button type="button" class="btn btn-sm btn-success restore-btn"
+                                                            data-id="@item.Id"
+                                                            data-filename="@(item.OriginalFileName ?? item.FileName ?? "document")"
+                                                            title="Restore document">
+                                                        <i class="fas fa-undo"></i>
+                                                        <span class="d-none d-sm-inline">Restore</span>
+                                                    </button>
+                                                }
                                                 <button type="button" class="btn btn-sm btn-outline-danger delete-permanent-btn"
                                                         data-id="@item.Id"
                                                         data-filename="@item.OriginalFileName"
@@ -261,7 +272,9 @@
                             <span class="text-muted" id="selectedCount">0 items selected</span>
                         </div>
                         <div class="d-flex gap-2">
-                           
+                            <button type="button" class="btn btn-success" id="bulkRestoreBtn" disabled>
+                                <i class="fas fa-undo me-1"></i> Restore Selected
+                            </button>
                             <button type="button" class="btn btn-danger" id="bulkDeleteBtn" disabled>
                                 <i class="fas fa-trash me-1"></i> Delete Selected
                             </button>
@@ -430,9 +443,10 @@ else
             function updateSelection() {
                 const selected = document.querySelectorAll('.row-select:checked');
                 const count = selected.length;
+                const hasRestorable = count > 0 && Array.from(selected).some(cb => cb.closest('tr')?.dataset.restorable === 'true');
 
                 selectedCount.textContent = `${count} item${count !== 1 ? 's' : ''} selected`;
-                if (bulkRestoreBtn) bulkRestoreBtn.disabled = count === 0;
+                if (bulkRestoreBtn) bulkRestoreBtn.disabled = !hasRestorable;
                 if (bulkDeleteBtn) bulkDeleteBtn.disabled = count === 0;
 
                 const allChecked = count === rowSelects.length;
@@ -550,12 +564,39 @@ else
 
                     try {
                         showLoading(this, 'Restoring...');
-                        await submitSingleAction('RestoreDocument', id);
+                        const formData = new FormData();
+                        formData.append('__RequestVerificationToken', getAntiForgeryToken());
+                        formData.append('id', id.toString());
+                        const response = await fetch('@Url.Action("RestoreDocument", "DeletedFiles")', {
+                            method: 'POST',
+                            body: formData,
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        const contentType = response.headers.get('content-type');
+                        const isJson = contentType && contentType.includes('application/json');
+                        let errorMessage = null;
+                        let data = null;
+                        if (isJson) {
+                            data = await response.json().catch(() => null);
+                            if (data && !data.success) errorMessage = data.error || 'Restore failed.';
+                        }
+                        if (!response.ok && !errorMessage) {
+                            errorMessage = (data && data.error) || await response.text().catch(() => null) || `Server error (${response.status}).`;
+                        }
+                        if (errorMessage) {
+                            resetButton(this);
+                            alert(errorMessage);
+                            return;
+                        }
+                        if (data && data.success) {
+                            window.location.reload();
+                            return;
+                        }
                         window.location.reload();
                     } catch (error) {
                         console.error('Restore error:', error);
                         resetButton(this);
-                        alert('Error restoring document. Please try again.');
+                        alert('Error restoring document: ' + (error.message || 'Please try again.'));
                     }
                 });
             });
@@ -570,12 +611,35 @@ else
 
                     try {
                         showLoading(this, 'Deleting...');
-                        await submitSingleAction('DeletePermanent', id);
+                        const formData = new FormData();
+                        formData.append('__RequestVerificationToken', getAntiForgeryToken());
+                        formData.append('id', id.toString());
+                        const response = await fetch('@Url.Action("DeletePermanent", "DeletedFiles")', {
+                            method: 'POST',
+                            body: formData,
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+                        const contentType = response.headers.get('content-type');
+                        const isJson = contentType && contentType.includes('application/json');
+                        let data = null;
+                        if (isJson) data = await response.json().catch(() => null);
+                        let errorMessage = (data && data.error) || null;
+                        if (!response.ok && !errorMessage)
+                            errorMessage = await response.text().catch(() => null) || `Server error (${response.status}).`;
+                        if (errorMessage) {
+                            resetButton(this);
+                            alert(errorMessage);
+                            return;
+                        }
+                        if (data && data.success) {
+                            window.location.reload();
+                            return;
+                        }
                         window.location.reload();
                     } catch (error) {
                         console.error('Delete error:', error);
                         resetButton(this);
-                        alert('Error deleting document. Please try again.');
+                        alert('Error deleting document: ' + (error.message || 'Please try again.'));
                     }
                 });
             });

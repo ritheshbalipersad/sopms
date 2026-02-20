@@ -1,0 +1,33 @@
+@model SOPMSApp.Areas.Admin.Controllers.DocumentTypeItem
+@{
+    ViewData["Title"] = "Edit Document Type";
+}
+
+<div class="container-fluid py-4">
+    <h2 class="mb-4"><i class="fas fa-file-alt me-2"></i>Edit Document Type</h2>
+
+    <div class="card shadow-sm" style="max-width: 500px;">
+        <div class="card-body">
+            <form asp-area="Admin" asp-controller="DocumentTypesAdmin" asp-action="Edit" method="post">
+                <input type="hidden" asp-for="BulletinID" />
+                <div class="mb-3">
+                    <label asp-for="BulletinName" class="form-label">Document Type Name</label>
+                    <input asp-for="BulletinName" class="form-control" />
+                    <span asp-validation-for="BulletinName" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="UDFChar1" class="form-label">Acronym (for SOP numbers)</label>
+                    <input asp-for="UDFChar1" class="form-control" />
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Save</button>
+                    <a asp-area="Admin" asp-controller="DocumentTypesAdmin" asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

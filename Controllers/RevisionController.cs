@@ -1,4 +1,4 @@
-﻿using DocumentFormat.OpenXml.Bibliography;
+using DocumentFormat.OpenXml.Bibliography;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -24,16 +24,16 @@ namespace SOPMSApp.Controllers
         private readonly IConfiguration _configuration;
         private readonly ILogger<RevisionController> _logger;
         private readonly DocRegisterService _docRegisterService;
+        private readonly IDocumentAuditLogService _auditLog;
 
-        public RevisionController( ApplicationDbContext context, IWebHostEnvironment env,IConfiguration configuration, ILogger<RevisionController> logger, DocRegisterService docRegisterService)
+        public RevisionController(ApplicationDbContext context, IWebHostEnvironment env, IConfiguration configuration, ILogger<RevisionController> logger, DocRegisterService docRegisterService, IDocumentAuditLogService auditLog)
         {
-         
             _env = env;
             _logger = logger;
             _context = context;
             _configuration = configuration;
             _docRegisterService = docRegisterService;
-            
+            _auditLog = auditLog;
         }
 
         // GET: Revision/Index
@@ -113,8 +113,15 @@ namespace SOPMSApp.Controllers
                 .OrderByDescending(h => h.RevisedOn)
                 .ToListAsync();
 
+            var auditLogs = await _context.DocumentAuditLogs
+                .AsNoTracking()
+                .Where(a => a.DocRegisterId == docRegisterId || (a.SopNumber == document.SopNumber && a.DocRegisterId == null))
+                .OrderByDescending(a => a.PerformedAtUtc)
+                .ToListAsync();
+
             ViewBag.SopNumber = document.SopNumber;
             ViewBag.Title = $"{document.SopNumber} - Revision History";
+            ViewBag.AuditLogs = auditLogs;
 
             return View(historyList);
         }
@@ -374,6 +381,8 @@ namespace SOPMSApp.Controllers
 
                 _context.Update(sop);
                 await _context.SaveChangesAsync();
+
+                await _auditLog.LogAsync(sop.Id, sop.SopNumber ?? "", "Revised", loggedInUser, model.ChangeDescription, sop.OriginalFile);
 
                 TempData["Success"] = "File(s) revised successfully! Awaiting approval.";
                 return RedirectToAction(nameof(Index));

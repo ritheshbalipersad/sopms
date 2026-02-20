@@ -1,0 +1,41 @@
+@model SOPMSApp.Areas.Admin.Controllers.DepartmentAdminItem
+@{
+    ViewData["Title"] = "Add Department";
+}
+
+<div class="container-fluid py-4">
+    <h2 class="mb-4"><i class="fas fa-building me-2"></i>Add Department</h2>
+
+    <div class="card shadow-sm" style="max-width: 500px;">
+        <div class="card-body">
+            <form asp-area="Admin" asp-controller="DepartmentsAdmin" asp-action="Create" method="post">
+                <div class="mb-3">
+                    <label asp-for="DepartmentID" class="form-label">Department ID</label>
+                    <input asp-for="DepartmentID" class="form-control" placeholder="e.g. ENG" />
+                    <span asp-validation-for="DepartmentID" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="DepartmentName" class="form-label">Department Name</label>
+                    <input asp-for="DepartmentName" class="form-control" placeholder="e.g. Engineering" />
+                    <span asp-validation-for="DepartmentName" class="text-danger small"></span>
+                </div>
+                <div class="mb-3">
+                    <label asp-for="SupervisorName" class="form-label">Supervisor Name</label>
+                    <input asp-for="SupervisorName" class="form-control" placeholder="Optional" />
+                </div>
+                <div class="mb-3 form-check">
+                    <input asp-for="Active" class="form-check-input" />
+                    <label asp-for="Active" class="form-check-label">Active (show in dropdowns)</label>
+                </div>
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Create</button>
+                    <a asp-area="Admin" asp-controller="DepartmentsAdmin" asp-action="Index" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

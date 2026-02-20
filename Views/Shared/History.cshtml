@@ -1,11 +1,12 @@
-﻿@model IEnumerable<SOPMSApp.Models.DocRegisterHistory>
-
+@model IEnumerable<SOPMSApp.Models.DocRegisterHistory>
+@using SOPMSApp.Models
 @{
     ViewData["Title"] = ViewBag.Title ?? "Revision History";
     var sopNumber = ViewBag.SopNumber as string;
     var documentTitle = ViewBag.DocumentTitle as string;
     var totalRevisions = Model?.Count() ?? 0;
     var latestRevision = Model?.OrderByDescending(x => x.RevisedOn).FirstOrDefault();
+    var auditLogs = ViewBag.AuditLogs as List<DocumentAuditLog> ?? new List<DocumentAuditLog>();
 }
 
 <div class="container-fluid py-4">
@@ -310,6 +311,37 @@
                 </div>
             }
         </div>
+
+        <!-- Audit Trail for this document -->
+        @if (auditLogs.Any())
+        {
+            <div class="card-body border-top bg-light">
+                <h5 class="mb-3"><i class="fas fa-clipboard-list me-2"></i>Audit trail</h5>
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Time (UTC)</th>
+                                <th>Action</th>
+                                <th>Performed by</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var log in auditLogs)
+                            {
+                                <tr>
+                                    <td>@log.PerformedAtUtc.ToString("yyyy-MM-dd HH:mm")</td>
+                                    <td><span class="badge bg-secondary">@log.Action</span></td>
+                                    <td>@log.PerformedBy</td>
+                                    <td class="text-truncate" style="max-width:300px" title="@log.Details">@(log.Details ?? log.DocumentTitle ?? "—")</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        }
 
         <!-- Footer -->
         @if (Model.Any())
