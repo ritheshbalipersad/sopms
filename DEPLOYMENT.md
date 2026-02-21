@@ -4,6 +4,329 @@ This guide covers publishing and running SOPMSApp on a Windows Server, either be
 
 ---
 
+## Complete Step-by-Step: First-Time IIS Deployment on Windows Server
+
+This section walks through every step to deploy SOPMSApp to IIS on Windows Server, including installing all dependencies from scratch.
+
+### Phase 1: Install Windows Server Roles and IIS
+
+**Step 1.1 – Open Server Manager**
+
+1. Log in to the Windows Server machine as Administrator (or a user with admin rights).
+2. Open **Server Manager** (Start → Server Manager).
+
+**Step 1.2 – Add Web Server (IIS) role**
+
+1. In Server Manager, click **Add roles and features**.
+2. On **Before You Begin**, click **Next**.
+3. **Installation Type**: Select **Role-based or feature-based installation** → **Next**.
+4. **Server Selection**: Select your server → **Next**.
+5. **Server Roles**: Check **Web Server (IIS)**.
+6. If prompted to add features (e.g. .NET Framework, Management Tools), click **Add Features** → **Next**.
+7. **Features**: Leave defaults → **Next**.
+8. **Web Server Role (IIS)**:
+   - **Role Services** – enable:
+     - **Web Server** → **Application Development** → **.NET Extensibility 4.8** (if available)
+     - **Web Server** → **Application Development** → **ASP.NET 4.8** (if available; needed for some IIS modules)
+     - **Web Server** → **Common HTTP Features** → **Default Document**, **Directory Browsing** (optional), **HTTP Errors**, **Static Content**
+     - **Web Server** → **Health and Diagnostics** → **HTTP Logging**
+     - **Web Server** → **Security** → **Request Filtering**, **Windows Authentication** (if you use Windows auth)
+9. Click **Next** → **Confirm** → **Install**.
+10. Wait for installation to complete → **Close**.
+
+**Step 1.3 – Install ASP.NET Core Hosting Module (required for IIS)**
+
+1. Download the **.NET 8.0 Hosting Bundle** from:  
+   [https://dotnet.microsoft.com/download/dotnet/8.0](https://dotnet.microsoft.com/download/dotnet/8.0)  
+   Choose **Hosting Bundle** (includes runtime + ASP.NET Core Module for IIS).
+2. Run the installer (`dotnet-hosting-8.0.x-win.exe`).
+3. Accept the license → **Install**.
+4. Restart IIS after installation:
+   ```powershell
+   net stop was /y
+   net start w3svc
+   ```
+
+---
+
+### Phase 2: Install SQL Server and Prepare Databases
+
+**Step 2.1 – SQL Server (if not already installed)**
+
+- If SQL Server is already installed (local or remote), skip to Step 2.2.
+- To install SQL Server locally:
+  1. Download [SQL Server Express](https://www.microsoft.com/sql-server/sql-server-downloads) or full edition.
+  2. Run setup → choose **Basic** or **Custom** installation.
+  3. Ensure **Database Engine** is selected.
+  4. Use **Mixed Mode (SQL Server and Windows Authentication)** if the app will use SQL login.
+  5. Note the instance name (e.g. `localhost`, `.\SQLEXPRESS`, or `SERVERNAME\INSTANCE`).
+
+**Step 2.2 – Create databases**
+
+The app requires these databases:
+
+| Database          | Purpose                               |
+|-------------------|----------------------------------------|
+| `DocRet` or `entTTSAP` | Main application data (DocRegister, etc.) |
+| `entTTSAP`        | Additional entity data                 |
+| `MCRegistrationSA`| User login/authentication              |
+
+Using **SQL Server Management Studio** or **sqlcmd**:
+
+```sql
+CREATE DATABASE DocRet;
+CREATE DATABASE entTTSAP;
+CREATE DATABASE MCRegistrationSA;
+```
+
+(Or use existing databases if your schema already uses different names; update connection strings accordingly.)
+
+---
+
+### Phase 3: Install Visual C++ Redistributable (for PDF generation)
+
+The app uses **DinkToPdf**, which relies on `libwkhtmltox.dll` (based on wkhtmltopdf). This native DLL may need the **Visual C++ Redistributable**.
+
+**Step 3.1**
+
+1. Download **Visual C++ Redistributable for Visual Studio 2015–2022 (x64)** from:  
+   [https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist)
+2. Run `vc_redist.x64.exe` → Install.
+3. Reboot if prompted (or at least restart IIS).
+
+---
+
+### Phase 4: Firewall
+
+Allow HTTP/HTTPS traffic to the web server.
+
+**Option A – Via GUI**
+
+1. **Windows Defender Firewall with Advanced Security** → **Inbound Rules** → **New Rule**.
+2. Rule type: **Port** → **TCP** → Specific ports: **80** (and **443** if using HTTPS).
+3. **Allow the connection** → Apply to Domain, Private, Public as needed → Name: `SOPMSApp HTTP/HTTPS`.
+
+**Option B – Via PowerShell (run as Administrator)**
+
+```powershell
+New-NetFirewallRule -DisplayName "SOPMSApp HTTP" -Direction Inbound -Protocol TCP -LocalPort 80 -Action Allow
+New-NetFirewallRule -DisplayName "SOPMSApp HTTPS" -Direction Inbound -Protocol TCP -LocalPort 443 -Action Allow
+```
+
+---
+
+### Phase 5: Create Application Folder and Storage Path
+
+**Step 5.1**
+
+1. Create the application folder, e.g. `C:\Apps\SOPMSApp`.
+2. Create the document storage folder, e.g. `D:\SOPMS_Documents` (or `C:\SOPMS_Documents` if no separate drive).
+
+**Step 5.2 – Set permissions**
+
+The IIS application pool identity (e.g. `IIS AppPool\SOPMSApp`) must have:
+
+- **C:\Apps\SOPMSApp**: Read & Execute, List, Read.
+- **C:\Apps\SOPMSApp\logs**: Read, Write (create if missing).
+- **C:\Apps\SOPMSApp\keys**: Read, Write (create if missing).
+- **D:\SOPMS_Documents**: Read, Write, Modify (or Full Control).
+
+Via PowerShell (run as Administrator):
+
+```powershell
+$appPath = "C:\Apps\SOPMSApp"
+$storagePath = "D:\SOPMS_Documents"
+$identity = "IIS AppPool\SOPMSApp"
+
+New-Item -ItemType Directory -Path $appPath -Force
+New-Item -ItemType Directory -Path "$appPath\logs" -Force
+New-Item -ItemType Directory -Path "$appPath\keys" -Force
+New-Item -ItemType Directory -Path $storagePath -Force
+
+$acl = Get-Acl $appPath
+$acl.SetAccessRuleProtection($false, $true)
+$rule = New-Object System.Security.AccessControl.FileSystemAccessRule($identity, "ReadAndExecute", "ContainerInherit,ObjectInherit", "None", "Allow")
+$acl.AddAccessRule($rule)
+Set-Acl $appPath $acl
+
+# Full control for logs, keys, and storage
+icacls "$appPath\logs" /grant "${identity}:(OI)(CI)F"
+icacls "$appPath\keys" /grant "${identity}:(OI)(CI)F"
+icacls $storagePath /grant "${identity}:(OI)(CI)F"
+```
+
+---
+
+### Phase 6: Publish and Copy the Application
+
+**Step 6.1 – On your development/build machine**
+
+```powershell
+cd c:\Code\SOPMSApp
+dotnet publish -c Release -o .\publish
+```
+
+**Step 6.2 – Copy to the server**
+
+1. Copy the entire contents of `.\publish` to `C:\Apps\SOPMSApp` on the server.
+2. Ensure these folders/files exist after copy:
+   - `SOPMSApp.dll`
+   - `web.config`
+   - `DinkToPdf\64bit\libwkhtmltox.dll`
+   - `appsettings.json`
+
+---
+
+### Phase 7: Configure the Application
+
+**Step 7.1 – Edit appsettings.json (or appsettings.Production.json)**
+
+On the server, edit `C:\Apps\SOPMSApp\appsettings.json` (or create `appsettings.Production.json` with production overrides):
+
+```json
+{
+  "ConnectionStrings": {
+    "DefaultConnection": "Server=.;Database=DocRet;Trusted_Connection=True;TrustServerCertificate=True;",
+    "entTTSAPConnection": "Server=.;Database=entTTSAP;Trusted_Connection=True;TrustServerCertificate=True;",
+    "LoginConnection": "Server=.;Database=MCRegistrationSA;Trusted_Connection=True;TrustServerCertificate=True;"
+  },
+  "StorageSettings": {
+    "BasePath": "D:\\SOPMS_Documents"
+  },
+  "AllowedHosts": "*"
+}
+```
+
+- Replace `Server=.` with your SQL Server instance (e.g. `Server=SERVERNAME\\SQLEXPRESS`).
+- For SQL authentication: `User Id=YourUser;Password=YourPassword;` instead of `Trusted_Connection=True`.
+- Ensure `BasePath` exists and the app pool has write access.
+
+**Step 7.2 – Set environment (optional)**
+
+To force Production mode:
+
+1. IIS Manager → **Application Pools** → **SOPMSApp** (you will create this next) → **Advanced Settings**.
+2. Under **Process Model** → **Environment Variables** → add:
+   - Name: `ASPNETCORE_ENVIRONMENT`  
+   - Value: `Production`
+
+---
+
+### Phase 8: Create IIS Application Pool
+
+**Step 8.1**
+
+1. Open **IIS Manager** (Run `inetmgr` or Server Manager → Tools → Internet Information Services (IIS) Manager).
+2. In the left pane, select the server name.
+3. Double-click **Application Pools**.
+4. In the right pane, click **Add Application Pool**.
+
+**Step 8.2 – Configure the pool**
+
+| Setting                    | Value              |
+|---------------------------|--------------------|
+| Name                      | `SOPMSApp`         |
+| .NET CLR version          | **No Managed Code**|
+| Managed pipeline mode     | **Integrated**     |
+| Start application pool    | Checked            |
+
+Click **OK**.
+
+**Step 8.3 – Advanced settings**
+
+1. Right-click **SOPMSApp** → **Advanced Settings**.
+2. **General**:
+   - **Enable 32-Bit Applications**: **False** (required for 64-bit `libwkhtmltox.dll`).
+3. **Process Model**:
+   - **Identity**: `ApplicationPoolIdentity` (default), or a custom domain account if you need specific DB/file permissions.
+4. Click **OK**.
+
+---
+
+### Phase 9: Create IIS Website
+
+**Step 9.1 – Add website**
+
+1. In IIS Manager, expand the server node → **Sites**.
+2. Right-click **Sites** → **Add Website**.
+
+**Step 9.2 – Configure the site**
+
+| Field           | Value                    |
+|-----------------|--------------------------|
+| Site name       | `SOPMSApp`               |
+| Application pool| `SOPMSApp`               |
+| Physical path   | `C:\Apps\SOPMSApp`       |
+| Binding type    | `http`                   |
+| Port            | `80`                     |
+| Host name       | (leave empty for default, or set your domain) |
+
+For HTTPS:
+
+- Type: `https`
+- Port: `443`
+- SSL certificate: Select your certificate.
+
+Click **OK**.
+
+**Step 9.3 – Large file uploads (optional)**
+
+If users upload files larger than ~30 MB:
+
+1. **Sites** → **SOPMSApp** → **Configuration Editor**.
+2. Section: `system.webServer` → `security` → `requestFiltering` → `requestLimits`.
+3. Set `maxAllowedContentLength` to `2147483648` (2 GB).
+4. Click **Apply**.
+
+---
+
+### Phase 10: Run Database Migrations and Start the Site
+
+**Step 10.1 – First run (applies migrations)**
+
+1. Ensure the app pool is started: **Application Pools** → **SOPMSApp** → **Start**.
+2. Browse to the site, e.g. `http://localhost` or `http://yourserver`.
+3. The app will apply Entity Framework migrations on first startup.
+4. If errors occur, check:
+   - `C:\Apps\SOPMSApp\logs\stdout_*.log`
+   - Windows Event Viewer → Application
+
+**Step 10.2 – web.config for self-contained publish**
+
+If you published **self-contained** (`--self-contained true`):
+
+1. Edit `C:\Apps\SOPMSApp\web.config`.
+2. Change:
+   - `processPath="dotnet"` → `processPath=".\SOPMSApp.exe"`
+   - `arguments=".\SOPMSApp.dll"` → `arguments=""`
+3. Save and recycle the app pool.
+
+---
+
+### Phase 11: Post-Deploy Verification
+
+| Check | Action |
+|-------|--------|
+| Site loads | Browse to `http://yourserver` |
+| Login works | Sign in with a test user (MCRegistrationSA must be configured) |
+| File upload | Upload a document and confirm it appears under `StorageSettings:BasePath` |
+| PDF generation | Use a feature that generates PDFs (e.g. export) – verifies DinkToPdf / libwkhtmltox |
+
+---
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|--------------|-----|
+| 500.19 or "Cannot read configuration file" | web.config error or path issue | Check `web.config` syntax; ensure path is correct |
+| 500.30 / Process failure | App crash on startup | Check `logs\stdout_*.log`; verify connection strings; ensure `DinkToPdf\64bit\libwkhtmltox.dll` exists |
+| 503 Service Unavailable | App pool stopped or misconfigured | Start the app pool; ensure **No Managed Code** and **32-Bit = False** |
+| PDF export fails | Missing VC++ Redist or libwkhtmltox | Install Visual C++ Redistributable x64; confirm `libwkhtmltox.dll` in `DinkToPdf\64bit\` |
+| SQL login fails | Connection string or permissions | Verify connection strings; ensure SQL user/Windows identity has access to DBs |
+| File upload fails | Permissions on BasePath | Grant Read/Write to `IIS AppPool\SOPMSApp` on `StorageSettings:BasePath` |
+
+---
+
 ## Updating an existing deployment
 
 Use this workflow when the app is **already installed** and you only need to deploy code/config changes.
@@ -74,7 +397,7 @@ On the Windows Server machine, install:
 | Requirement | Details |
 |-------------|---------|
 | **.NET 8.0 Runtime (ASP.NET Core)** | [Download](https://dotnet.microsoft.com/download/dotnet/8.0) – install "Hosting Bundle" if using IIS |
-| **SQL Server** | Local or remote instance; databases: `entTTSAP`, `MCRegistrationSA` (for login) |
+| **SQL Server** | Local or remote instance; databases: `DocRet` (main app), `entTTSAP` (entities), `MCRegistrationSA` (login) |
 | **IIS** (optional) | Only if you want to host behind IIS – enable "ASP.NET Core Module V2" |
 
 - For **IIS**: Install [.NET 8.0 Hosting Bundle](https://dotnet.microsoft.com/download/dotnet/8.0) (includes runtime + ASP.NET Core Module). Then ensure the **ASP.NET Core** feature is installed in IIS.
@@ -123,7 +446,8 @@ Use the **IISProfile** (or your Web Deploy profile) from Visual Studio: **Right-
 Edit the published app’s config (e.g. `C:\Apps\SOPMSApp\appsettings.Production.json` or override `appsettings.json`) on the server:
 
 - **Connection strings** – point to the server’s SQL instance and databases:
-  - `DefaultConnection`, `entTTSAPConnection`: e.g. `Server=YourSqlServer;Database=entTTSAP;...`
+  - `DefaultConnection`: e.g. `Server=YourSqlServer;Database=DocRet;...` (main app data, DocRegisters)
+  - `entTTSAPConnection`: e.g. `Server=YourSqlServer;Database=entTTSAP;...` (entities, departments, etc.)
   - `LoginConnection`: e.g. `Server=YourSqlServer;Database=MCRegistrationSA;...`
   - Use `Trusted_Connection=True` for Windows auth, or `User Id=...;Password=...` for SQL auth.
   - Add `TrustServerCertificate=True` if the server uses a certificate that’s not trusted by the client.
@@ -135,7 +459,7 @@ Example (adjust server names and paths):
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=.;Database=entTTSAP;Trusted_Connection=True;TrustServerCertificate=True;",
+    "DefaultConnection": "Server=.;Database=DocRet;Trusted_Connection=True;TrustServerCertificate=True;",
     "entTTSAPConnection": "Server=.;Database=entTTSAP;Trusted_Connection=True;TrustServerCertificate=True;",
     "LoginConnection": "Server=.;Database=MCRegistrationSA;Trusted_Connection=True;TrustServerCertificate=True;"
   },
@@ -230,7 +554,7 @@ The published folder should already contain a `web.config` like:
 
 ### 4.6 Large file uploads (optional)
 
-If users upload very large files, in IIS Manager → **Sites** → **SOPMSApp** → **Configuration Editor** → `system.webServer/serverRuntime` → **requestLimits.maxAllowedContentLength** (e.g. 2147483648 for 2 GB). The app already configures Kestrel limits; this is for IIS.
+If users upload very large files, in IIS Manager → **Sites** → **SOPMSApp** → **Configuration Editor** → `system.webServer/security/requestFiltering/requestLimits` → **maxAllowedContentLength** (e.g. 2147483648 for 2 GB). The app already configures Kestrel limits; this is the IIS request filter limit.
 
 ---
 
