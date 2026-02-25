@@ -211,6 +211,20 @@ To force Production mode:
    - Value: `Production`
 
 ---
+   or 
+   change the webconfig 
+   
+   <configuration>
+  <system.webServer>
+    <aspNetCore processPath="dotnet" arguments=".\YourApp.dll" stdoutLogEnabled="false" stdoutLogFile=".\logs\stdout">
+      <environmentVariables>
+        <environmentVariable name="ASPNETCORE_ENVIRONMENT" value="Production" />
+      </environmentVariables>
+    </aspNetCore>
+  </system.webServer>
+</configuration>
+
+
 
 ### Phase 8: Create IIS Application Pool
 

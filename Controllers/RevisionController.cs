@@ -115,7 +115,7 @@ namespace SOPMSApp.Controllers
 
             var auditLogs = await _context.DocumentAuditLogs
                 .AsNoTracking()
-                .Where(a => a.DocRegisterId == docRegisterId || (a.SopNumber == document.SopNumber && a.DocRegisterId == null))
+                .Where(a => a.DocRegisterId == docRegisterId || a.SopNumber == document.SopNumber)
                 .OrderByDescending(a => a.PerformedAtUtc)
                 .ToListAsync();
 

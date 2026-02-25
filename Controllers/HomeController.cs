@@ -1,9 +1,10 @@
-﻿using DinkToPdf.Contracts;
+using DinkToPdf.Contracts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using SOPMSApp.Data;
 using SOPMSApp.Models;
+using SOPMSApp.Services;
 using SOPMSApp.ViewModels;
 using System.Data;
 using System.Diagnostics;
@@ -18,13 +19,16 @@ namespace SOPMSApp.Controllers
         private readonly ApplicationDbContext _context;
         private readonly entTTSAPDbContext _entContext;
         private readonly IConfiguration _configuration;
-        public HomeController(ILogger<HomeController> logger, ApplicationDbContext context, IConfiguration configuration, entTTSAPDbContext entContext, IConverter converter)
+        private readonly IDocumentAuditLogService _auditLog;
+
+        public HomeController(ILogger<HomeController> logger, ApplicationDbContext context, IConfiguration configuration, entTTSAPDbContext entContext, IConverter converter, IDocumentAuditLogService auditLog)
         {
             _logger = logger;
             _context = context;
             _configuration = configuration;
             _entContext = entContext;
             _converter = converter;
+            _auditLog = auditLog;
         }
 
         public async Task<IActionResult> Index()
@@ -392,6 +396,10 @@ namespace SOPMSApp.Controllers
             {
                 return NotFound("File not found on the server.");
             }
+
+            var performedBy = User.FindFirst("LaborName")?.Value ?? User.Identity?.Name ?? "System";
+            await _auditLog.LogAsync(document.Id, document.SopNumber ?? "", "Downloaded", performedBy,
+                "Document downloaded (legacy upload path)", document.FileName);
 
             var memory = new MemoryStream();
             using (var stream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))

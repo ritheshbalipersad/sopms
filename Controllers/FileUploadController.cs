@@ -203,6 +203,17 @@ namespace SOPMSApp.Controllers
             using (var stream = new FileStream(newOriginalPath, FileMode.Create))
                 await OriginalFile.CopyToAsync(stream);
 
+            // Capture previous version for revision history (before overwriting doc)
+            var prevRevision = doc.Revision;
+            var prevOriginalFile = doc.OriginalFile;
+            var prevFileName = doc.FileName ?? "N/A";
+            var prevStatus = doc.Status;
+            var prevUploadDate = doc.UploadDate;
+            var prevEffectiveDate = doc.EffectiveDate;
+            var prevLastReviewDate = doc.LastReviewDate;
+            var prevDepartment = doc.Department;
+            var prevDocumentType = doc.DocumentType ?? "";
+
             string? newPdfFileName = null;
             if (PdfFile != null && PdfFile.Length > 0)
             {
@@ -240,6 +251,27 @@ namespace SOPMSApp.Controllers
             doc.UploadDate = DateTime.Now;
 
             _context.DocRegisters.Update(doc);
+            await _context.SaveChangesAsync();
+
+            // Add revision history so "Revision History" page shows the replaced version
+            var historyEntry = new DocRegisterHistory
+            {
+                DocRegisterId = doc.Id,
+                SopNumber = doc.SopNumber ?? "",
+                OriginalFile = prevOriginalFile,
+                FileName = prevFileName,
+                Department = prevDepartment ?? "",
+                Revision = prevRevision ?? "",
+                EffectiveDate = prevEffectiveDate,
+                LastReviewDate = prevLastReviewDate,
+                UploadDate = prevUploadDate,
+                Status = prevStatus ?? "",
+                DocumentType = prevDocumentType,
+                RevisedBy = performedBy,
+                RevisedOn = DateTime.Now,
+                ChangeDescription = "Document replaced (admin review). Previous version archived."
+            };
+            _context.DocRegisterHistories.Add(historyEntry);
             await _context.SaveChangesAsync();
 
             var details = $"Previous version archived to Archive/Replaced/{archiveSubDir}. New files: {newOriginalFileName}" + (newPdfFileName != null ? $", {newPdfFileName}" : "");
@@ -1803,6 +1835,11 @@ namespace SOPMSApp.Controllers
 
                 if (actualFilePath == null)
                     return NotFound("The document file could not be found in the storage location.");
+
+                var performedBy = User.FindFirst("LaborName")?.Value ?? User.Identity?.Name ?? "System";
+                var downloadType = actualFilePath.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) ? "PDF" : "Original";
+                await _auditLog.LogAsync(document.Id, document.SopNumber ?? "", "Downloaded", performedBy,
+                    $"Document {downloadType} downloaded: {downloadName}", document.OriginalFile);
 
                 string contentType = GetMimeType(Path.GetExtension(actualFilePath)) ?? "application/octet-stream";
                 if (string.IsNullOrEmpty(downloadName))

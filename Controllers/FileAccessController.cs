@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using SOPMSApp.Controllers;
+using SOPMSApp.Data;
+using SOPMSApp.Services;
 
 public class FileAccessController : Controller
 {
@@ -8,13 +11,17 @@ public class FileAccessController : Controller
     private readonly ILogger<FileUploadController> _logger;
     private readonly IConfiguration _configuration;
     private readonly IWebHostEnvironment _hostingEnvironment;
+    private readonly ApplicationDbContext _context;
+    private readonly IDocumentAuditLogService _auditLog;
 
-    public FileAccessController(IOptions<StorageSettings> storageSettings, ILogger<FileUploadController> logger, IConfiguration configuration, IWebHostEnvironment hostingEnvironment)
+    public FileAccessController(IOptions<StorageSettings> storageSettings, ILogger<FileUploadController> logger, IConfiguration configuration, IWebHostEnvironment hostingEnvironment, ApplicationDbContext context, IDocumentAuditLogService auditLog)
     {
         _storageSettings = storageSettings.Value;
         _logger = logger;
         _configuration = configuration;
         _hostingEnvironment = hostingEnvironment;
+        _context = context;
+        _auditLog = auditLog;
     }
 
     [HttpGet]
@@ -57,8 +64,20 @@ public class FileAccessController : Controller
     }
 
     [HttpGet]
-    public IActionResult Originals(string docType, string fileName)
+    public async Task<IActionResult> Originals(string docType, string fileName)
     {
+        var safeFileName = System.IO.Path.GetFileName(fileName);
+        if (!string.IsNullOrEmpty(safeFileName) && !string.IsNullOrEmpty(docType))
+        {
+            var doc = await _context.DocRegisters
+                .AsNoTracking()
+                .FirstOrDefaultAsync(d => d.OriginalFile == safeFileName && d.DocType == docType && (d.IsArchived != true));
+            if (doc != null)
+            {
+                var performedBy = User.FindFirst("LaborName")?.Value ?? User.Identity?.Name ?? "System";
+                await _auditLog.LogAsync(doc.Id, doc.SopNumber ?? "", "Downloaded", performedBy, "Original file downloaded", doc.OriginalFile);
+            }
+        }
         return ServeFile(System.IO.Path.Combine("Originals", docType), fileName);
     }
 
@@ -69,7 +88,7 @@ public class FileAccessController : Controller
     }
 
     [HttpGet]
-    public IActionResult GetPdf(string fileName, string docType = null)
+    public async Task<IActionResult> GetPdf(string fileName, string docType = null)
     {
         if (string.IsNullOrWhiteSpace(fileName))
             return NotFound("File name missing.");
@@ -185,6 +204,18 @@ public class FileAccessController : Controller
         {
             _logger.LogWarning("PDF '{Target}' not found. BasePath: {BasePath}, DocType: {DocType}", targetPdf, basePath, docType ?? "(none)");
             return NotFound("PDF was not found in the storage system.");
+        }
+
+        var docForAudit = await _context.DocRegisters
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d =>
+                (d.FileName == targetPdf || d.OriginalFile == targetPdf) &&
+                (string.IsNullOrEmpty(docType) || d.DocType == docType) &&
+                (d.IsArchived != true));
+        if (docForAudit != null)
+        {
+            var performedBy = User.FindFirst("LaborName")?.Value ?? User.Identity?.Name ?? "System";
+            await _auditLog.LogAsync(docForAudit.Id, docForAudit.SopNumber ?? "", "Downloaded", performedBy, "PDF viewed/downloaded", docForAudit.FileName ?? docForAudit.OriginalFile);
         }
 
         Response.Headers["Content-Disposition"] = "inline";
